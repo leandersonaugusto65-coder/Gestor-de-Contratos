@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import type { Client, Contract, ContractItem, Commitment, Invoice, InvoiceItem, DashboardContract, DashboardCommitment, DashboardInvoice, GlobalSummaryData, Profile } from './types';
@@ -198,7 +199,17 @@ export default function App() {
   }, [theme]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.error('Error logging out:', error);
+      setNotification({ message: 'Erro de comunicação ao sair.', type: 'error' });
+    }
+
+    // Force a UI logout by clearing all session-related state.
+    // This provides immediate feedback and handles offline cases.
+    setSession(null);
+    setProfile(null);
     setClients(null);
     setSelectedClientId(null);
   };
@@ -515,18 +526,19 @@ export default function App() {
     // Global summary should be calculated on ALL data, not filtered data
     const summary: GlobalSummaryData = { totalBidValue: 0, totalCommittedValue: 0, totalSuppliedValue: 0, balanceToSupplyValue: 0, totalToReceiveValue: 0 };
     clients.forEach(c => c.contracts.forEach(ct => {
-        const contractBidValue = ct.items.reduce((sum, item) => sum + (item.unitValue * item.quantityBid), 0);
+        // FIX: Coerce values to numbers to prevent arithmetic errors if data is string-based.
+        const contractBidValue = ct.items.reduce((sum, item) => sum + (Number(item.unitValue) * Number(item.quantityBid)), 0);
         const contractCommittedValue = ct.commitments.reduce((sum, com) => sum + com.items.reduce((itemSum, comItem) => {
             const item = ct.items.find(i => i.id === comItem.contractItemId);
-            return itemSum + (item ? item.unitValue * comItem.quantity : 0);
+            return itemSum + (item ? Number(item.unitValue) * Number(comItem.quantity) : 0);
         }, 0), 0);
         const contractSuppliedValue = ct.invoices.reduce((sum, inv) => sum + inv.items.reduce((itemSum, invItem) => {
             const item = ct.items.find(i => i.id === invItem.contractItemId);
-            return itemSum + (item ? item.unitValue * invItem.quantitySupplied : 0);
+            return itemSum + (item ? Number(item.unitValue) * Number(invItem.quantitySupplied) : 0);
         }, 0), 0);
         const contractPaidValue = ct.invoices.filter(inv => inv.isPaid).reduce((sum, inv) => sum + inv.items.reduce((itemSum, invItem) => {
             const item = ct.items.find(i => i.id === invItem.contractItemId);
-            return itemSum + (item ? item.unitValue * invItem.quantitySupplied : 0);
+            return itemSum + (item ? Number(item.unitValue) * Number(invItem.quantitySupplied) : 0);
         }, 0), 0);
 
         summary.totalBidValue += contractBidValue;

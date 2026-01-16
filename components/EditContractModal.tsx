@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Contract } from '../types';
 import { useDebounce } from '../hooks/useDebounce';
@@ -63,9 +62,9 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
                     const govApiResponse = await fetch(proxyUrl);
                     if (govApiResponse.ok) {
                         const govApiData = await govApiResponse.json();
-                        if (govApiData?._embedded?.orgaos?.[0]?.codigo_uasg) {
+                        if (govApiData?._embedded?.orgaos?.[0]?.codigoUasg) {
                            if (!uasg) {
-                               setUasg(govApiData._embedded.orgaos[0].codigo_uasg);
+                               setUasg(govApiData._embedded.orgaos[0].codigoUasg);
                            }
                         }
                     }

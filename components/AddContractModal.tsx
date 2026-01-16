@@ -1,10 +1,8 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import type { Client, Contract } from '../types';
 import { useDebounce } from '../hooks/useDebounce';
 import { SpinnerIcon } from './icons/SpinnerIcon';
 import { formatCNPJ, validateCNPJ, stripCNPJ } from '../utils/cnpj';
-import { GoogleGenAI } from '@google/genai';
 
 interface AddContractModalProps {
   clients: Client[];
@@ -25,39 +23,12 @@ export const AddContractModal: React.FC<AddContractModalProps> = ({ clients, onC
     const [cnpjStatus, setCnpjStatus] = useState<{ text: string; status: 'active' | 'inactive' } | null>(null);
 
     const [isFetchingCnpj, setIsFetchingCnpj] = useState(false);
-    const [isFetchingUasgFromGoogle, setIsFetchingUasgFromGoogle] = useState(false);
+    const [isFetchingUasg, setIsFetchingUasg] = useState(false);
     const [apiError, setApiError] = useState<string | null>(null);
     
     const debouncedCnpj = useDebounce(cnpj, 800);
 
-    const fetchUasgFromGoogle = useCallback(async (organName: string) => {
-        if (!organName) return;
-        setIsFetchingUasgFromGoogle(true);
-        try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
-            const prompt = `Qual é o código UASG do órgão "${organName}"? Responda apenas com o número de 6 dígitos, se encontrar.`;
-
-            const response = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: prompt,
-                config: { tools: [{ googleSearch: {} }] },
-            });
-
-            const text = response.text;
-            if (text) {
-                const uasgMatch = text.match(/\b(\d{6})\b/);
-                if (uasgMatch && uasgMatch[1]) {
-                    setUasg(uasgMatch[1]);
-                }
-            }
-        } catch (err) {
-            console.error("Error fetching UASG from Google/Gemini:", err);
-        } finally {
-            setIsFetchingUasgFromGoogle(false);
-        }
-    }, []);
-
-    // Effect for CNPJ -> Name, Address, CEP, Status, and then UASG via Google
+    // Effect for CNPJ -> Name, Address, CEP, Status, and then UASG
     useEffect(() => {
         const fetchCnpjData = async (cnpjToFetch: string) => {
             const onlyNumbersCnpj = stripCNPJ(cnpjToFetch);
@@ -95,8 +66,24 @@ export const AddContractModal: React.FC<AddContractModalProps> = ({ clients, onC
                         setCnpjStatus({ text: data.descricao_situacao_cadastral, status: isActive ? 'active' : 'inactive' });
                     }
                     
-                    if (organName) {
-                        fetchUasgFromGoogle(organName);
+                    // --- UASG Fetch from compras.dados.gov.br ---
+                    setIsFetchingUasg(true);
+                    try {
+                        const govApiUrl = `https://compras.dados.gov.br/orgaos/v1/orgaos.json?cnpj=${onlyNumbersCnpj}`;
+                        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(govApiUrl)}`;
+                        const govApiResponse = await fetch(proxyUrl);
+                        if (govApiResponse.ok) {
+                            const govApiData = await govApiResponse.json();
+                            if (govApiData?._embedded?.orgaos?.[0]?.codigoUasg) {
+                                setUasg(govApiData._embedded.orgaos[0].codigoUasg);
+                            } else {
+                                console.warn(`UASG não encontrada para o CNPJ: ${onlyNumbersCnpj}`);
+                            }
+                        }
+                    } catch (govError) {
+                        console.error("UASG lookup by CNPJ failed:", govError);
+                    } finally {
+                        setIsFetchingUasg(false);
                     }
                 }
             } catch (err) {
@@ -116,7 +103,7 @@ export const AddContractModal: React.FC<AddContractModalProps> = ({ clients, onC
             setApiError(null);
             fetchCnpjData(debouncedCnpj);
         }
-    }, [debouncedCnpj, fetchUasgFromGoogle]);
+    }, [debouncedCnpj]);
 
     const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
@@ -165,7 +152,7 @@ export const AddContractModal: React.FC<AddContractModalProps> = ({ clients, onC
                             <h2 className="text-xl font-bold text-white">Novo Contrato</h2>
                             <div className="flex gap-2">
                                 {isFetchingCnpj && <span className="text-[10px] text-blue-400 animate-pulse">Buscando CNPJ...</span>}
-                                {isFetchingUasgFromGoogle && <span className="text-[10px] text-green-400 animate-pulse">Buscando UASG (Google)...</span>}
+                                {isFetchingUasg && <span className="text-[10px] text-green-400 animate-pulse">Buscando UASG...</span>}
                             </div>
                         </header>
                         
@@ -196,8 +183,8 @@ export const AddContractModal: React.FC<AddContractModalProps> = ({ clients, onC
                         <div>
                             <label htmlFor="uasg" className="block text-sm font-medium text-gray-400 mb-1">Nº da UASG</label>
                             <div className="relative">
-                                <input type="text" id="uasg" value={uasg} onChange={(e) => setUasg(e.target.value)} className="block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-white focus:outline-none focus:border-yellow-600" placeholder="Preenchido via Google" />
-                                {isFetchingUasgFromGoogle && <SpinnerIcon className="w-4 h-4 text-yellow-500 absolute right-3 top-1/2 -translate-y-1/2" />}
+                                <input type="text" id="uasg" value={uasg} onChange={(e) => setUasg(e.target.value)} className="block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-white focus:outline-none focus:border-yellow-600" placeholder="Preenchido via CNPJ" />
+                                {isFetchingUasg && <SpinnerIcon className="w-4 h-4 text-yellow-500 absolute right-3 top-1/2 -translate-y-1/2" />}
                             </div>
                         </div>
                         
