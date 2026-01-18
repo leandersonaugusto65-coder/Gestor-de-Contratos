@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { Client, GlobalSummaryData, DashboardContract, DashboardCommitment, DashboardInvoice, DashboardView } from '../types';
 import { GlobalSummary } from './GlobalSummary';
@@ -9,10 +10,12 @@ import { BanknotesIcon } from './icons/BanknotesIcon';
 import { DocumentDuplicateIcon } from './icons/DocumentDuplicateIcon';
 import { ClipboardDocumentListIcon } from './icons/ClipboardDocumentListIcon';
 import { ClipboardDocumentCheckIcon } from './icons/ClipboardDocumentCheckIcon';
+import { WrenchScrewdriverIcon } from './icons/WrenchScrewdriverIcon';
 import { CommitmentDetailModal } from './CommitmentDetailModal';
 import { InvoiceDetailModal } from './InvoiceDetailModal';
 import { ExportDropdown } from './ExportDropdown';
 import { FinancialBreakdown } from './FinancialBreakdown';
+import { ProposalGenerator } from './ProposalGenerator';
 import { formatCNPJ } from '../utils/cnpj';
 
 interface DashboardProps {
@@ -131,32 +134,38 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     
     return (
         <div className="space-y-8">
-            <div className="grid grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-5 gap-2 sm:gap-4">
                 <NavButton label="Geral" icon={<BanknotesIcon />} isActive={activeView === 'finance'} onClick={() => setActiveView('finance')} />
                 <NavButton label="Contratos" icon={<DocumentDuplicateIcon />} isActive={activeView === 'contracts'} onClick={() => setActiveView('contracts')} />
                 <NavButton label="Fornec." icon={<ClipboardDocumentListIcon />} isActive={activeView === 'commitments'} onClick={() => setActiveView('commitments')} />
                 <NavButton label="Pagtos." icon={<ClipboardDocumentCheckIcon />} isActive={activeView === 'invoices'} onClick={() => setActiveView('invoices')} />
+                <NavButton label="Proposta" icon={<WrenchScrewdriverIcon />} isActive={activeView === 'proposal'} onClick={() => setActiveView('proposal')} />
             </div>
 
             <div className="animate-fade-in">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-gray-800 pb-4">
                     <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-                       {activeView === 'finance' ? 'Gestão Financeira Global' : activeView === 'commitments' ? 'Fornecimento Pendente' : activeView === 'invoices' ? 'Pagamentos Pendentes' : 'Contratos Ativos'}
+                       {activeView === 'finance' ? 'Gestão Financeira Global' : 
+                        activeView === 'commitments' ? 'Fornecimento Pendente' : 
+                        activeView === 'invoices' ? 'Pagamentos Pendentes' : 
+                        activeView === 'proposal' ? 'Gerador de Propostas Comerciais' : 'Contratos Ativos'}
                     </h2>
-                    <div className="flex w-full sm:w-auto items-center gap-3">
-                        <div className="flex items-center bg-gray-900 border border-gray-700 rounded-lg p-1">
-                            <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="bg-transparent border-none text-white text-xs font-bold py-1.5 px-3 focus:ring-0 cursor-pointer">
-                                <option value="all">Anos</option>
-                                {availableYears.map(year => <option key={year} value={year}>{year}</option>)}
-                            </select>
-                            <div className="w-px h-4 bg-gray-700 mx-1" />
-                            <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="bg-transparent border-none text-white text-xs font-bold py-1.5 px-3 focus:ring-0 cursor-pointer">
-                                <option value="all">Mês</option>
-                                {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>{new Intl.DateTimeFormat('pt-BR', {month: 'short'}).format(new Date(2000, m-1, 1)).toUpperCase()}</option>)}
-                            </select>
+                    {activeView !== 'proposal' && (
+                        <div className="flex w-full sm:w-auto items-center gap-3">
+                            <div className="flex items-center bg-gray-900 border border-gray-700 rounded-lg p-1">
+                                <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="bg-transparent border-none text-white text-xs font-bold py-1.5 px-3 focus:ring-0 cursor-pointer">
+                                    <option value="all">Anos</option>
+                                    {availableYears.map(year => <option key={year} value={year}>{year}</option>)}
+                                </select>
+                                <div className="w-px h-4 bg-gray-700 mx-1" />
+                                <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="bg-transparent border-none text-white text-xs font-bold py-1.5 px-3 focus:ring-0 cursor-pointer">
+                                    <option value="all">Mês</option>
+                                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>{new Intl.DateTimeFormat('pt-BR', {month: 'short'}).format(new Date(2000, m-1, 1)).toUpperCase()}</option>)}
+                                </select>
+                            </div>
+                            <ExportDropdown headers={exportHeaders} data={exportData} filenamePrefix={exportFilename} pdfTitle={exportPdfTitle} />
                         </div>
-                        <ExportDropdown headers={exportHeaders} data={exportData} filenamePrefix={exportFilename} pdfTitle={exportPdfTitle} />
-                    </div>
+                    )}
                 </div>
 
                 <div className="transition-all duration-500 ease-in-out">
@@ -177,6 +186,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                     )}
                     {activeView === 'commitments' && <AllCommitmentsView commitments={pendingCommitments} onSelectCommitment={setSelectedCommitment} />}
                     {activeView === 'invoices' && <AllInvoicesView invoices={pendingInvoices} onSelectInvoice={setSelectedInvoice} />}
+                    {activeView === 'proposal' && <ProposalGenerator clients={clients} />}
                     {activeView === 'contracts' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {contracts.length > 0 ? (

@@ -1,5 +1,4 @@
 
-
 export interface User {
   id: number;
   name: string;
@@ -114,4 +113,4 @@ export interface DashboardInvoice extends Invoice {
   contractId: number;
 }
 
-export type DashboardView = 'finance' | 'contracts' | 'commitments' | 'invoices';
+export type DashboardView = 'finance' | 'contracts' | 'commitments' | 'invoices' | 'proposal';
