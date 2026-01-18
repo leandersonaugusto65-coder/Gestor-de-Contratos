@@ -22,12 +22,10 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
     const [cnpjStatus, setCnpjStatus] = useState<{ text: string; status: 'active' | 'inactive' } | null>(null);
 
     const [isFetchingCnpj, setIsFetchingCnpj] = useState(false);
-    const [isFetchingUasg, setIsFetchingUasg] = useState(false);
     
     const debouncedCnpj = useDebounce(cnpj, 800);
-    const debouncedUasg = useDebounce(uasg, 800);
 
-    // CNPJ lookup for Address, Status, and UASG
+    // CNPJ lookup for Address, Status
     useEffect(() => {
         const fetchCnpjData = async (val: string) => {
             const onlyNumbers = stripCNPJ(val);
@@ -55,57 +53,11 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
                         setCnpjStatus({ text: data.descricao_situacao_cadastral, status: isActive ? 'active' : 'inactive' });
                     }
                 }
-
-                // --- Fetch 2: Compras Gov API for UASG ---
-                try {
-                    const govApiUrl = `https://compras.dados.gov.br/orgaos/v1/orgaos.json?cnpj=${onlyNumbers}`;
-                    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(govApiUrl)}`;
-                    const govApiResponse = await fetch(proxyUrl);
-                    if (govApiResponse.ok) {
-                        const govApiData = await govApiResponse.json();
-                        if (govApiData?._embedded?.orgaos?.[0]?.codigoUasg) {
-                           if (!uasg) {
-                               setUasg(govApiData._embedded.orgaos[0].codigoUasg);
-                           }
-                        }
-                    }
-                } catch (govError) {
-                    console.error("UASG lookup by CNPJ failed:", govError);
-                }
             } catch (err) { console.error(err); }
             finally { setIsFetchingCnpj(false); }
         };
         if (debouncedCnpj) fetchCnpjData(debouncedCnpj);
-    }, [debouncedCnpj, contract.cnpj, uasg]);
-
-    // UASG lookup
-    useEffect(() => {
-        const fetchUasgData = async (val: string) => {
-            const onlyNumbers = stripCNPJ(val);
-            if (onlyNumbers.length < 6 || onlyNumbers === stripCNPJ(contract.uasg || '')) return;
-
-            setIsFetchingUasg(true);
-            try {
-                const targetUrl = `https://pncp.gov.br/api/pncp/v1/orgaos/uasg/${onlyNumbers}`;
-                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-                const response = await fetch(proxyUrl);
-                if (!response.ok) {
-                    throw new Error(`UASG "${val}" não encontrada ou API indisponível.`);
-                }
-                const data = await response.json();
-
-                if(data && data.cnpj) {
-                    if(!cnpj) {
-                        setCnpj(formatCNPJ(data.cnpj));
-                    }
-                } else {
-                    throw new Error('Resposta da API de UASG inválida ou UASG não encontrada.');
-                }
-            } catch (err) { console.error(err); }
-            finally { setIsFetchingUasg(false); }
-        };
-        if (debouncedUasg) fetchUasgData(debouncedUasg);
-    }, [debouncedUasg, contract.uasg, cnpj]);
+    }, [debouncedCnpj, contract.cnpj]);
 
     const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
@@ -161,7 +113,6 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
                                 onChange={(e) => setUasg(e.target.value)}
                                 className="block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-white focus:outline-none focus:border-yellow-600"
                             />
-                            {isFetchingUasg && <SpinnerIcon className="w-4 h-4 text-yellow-500 absolute right-3 top-8" />}
                         </div>
                         <div className="relative">
                             <label className="block text-xs font-medium text-gray-500 uppercase mb-1">CNPJ</label>

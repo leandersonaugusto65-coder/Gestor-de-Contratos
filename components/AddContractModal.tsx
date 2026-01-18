@@ -3,7 +3,6 @@ import type { Client, Contract } from '../types';
 import { useDebounce } from '../hooks/useDebounce';
 import { SpinnerIcon } from './icons/SpinnerIcon';
 import { formatCNPJ, validateCNPJ, stripCNPJ } from '../utils/cnpj';
-import { GoogleGenAI } from '@google/genai';
 
 interface AddContractModalProps {
   clients: Client[];
@@ -51,7 +50,8 @@ export const AddContractModal: React.FC<AddContractModalProps> = ({ clients, onC
                 
                 const data = await brasilApiResponse.json();
                 if (data) {
-                    setClientName(data.nome_fantasia || data.razao_social);
+                    const organName = data.nome_fantasia || data.razao_social;
+                    setClientName(organName);
                     const formattedAddress = [data.logradouro, data.numero, data.complemento, data.bairro, data.municipio, data.uf].filter(Boolean).join(', ').replace(' ,', ',');
                     setAddress(formattedAddress);
                     if (data.cep) setCep(data.cep.replace(/\D/g, ''));

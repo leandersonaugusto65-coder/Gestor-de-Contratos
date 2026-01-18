@@ -21,11 +21,10 @@ export const EditClientModal: React.FC<EditClientModalProps> = ({ client, onClos
     const [cnpjStatus, setCnpjStatus] = useState<{ text: string; status: 'active' | 'inactive' } | null>(null);
 
     const [isFetchingCnpj, setIsFetchingCnpj] = useState(false);
-    const [isFetchingUasg, setIsFetchingUasg] = useState(false);
     
     const debouncedCnpj = useDebounce(cnpj, 800);
 
-    // CNPJ lookup for Address, Name, CEP, Status, and UASG
+    // CNPJ lookup for Address, Name, CEP, Status
     useEffect(() => {
         const fetchCnpjData = async (val: string) => {
             const onlyNumbers = stripCNPJ(val);
@@ -53,26 +52,6 @@ export const EditClientModal: React.FC<EditClientModalProps> = ({ client, onClos
                     if (data.descricao_situacao_cadastral) {
                         const isActive = data.descricao_situacao_cadastral === 'ATIVA';
                         setCnpjStatus({ text: data.descricao_situacao_cadastral, status: isActive ? 'active' : 'inactive' });
-                    }
-
-                    // --- UASG Fetch from compras.dados.gov.br ---
-                    setIsFetchingUasg(true);
-                    try {
-                        const govApiUrl = `https://compras.dados.gov.br/orgaos/v1/orgaos.json?cnpj=${onlyNumbers}`;
-                        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(govApiUrl)}`;
-                        const govApiResponse = await fetch(proxyUrl);
-                        if (govApiResponse.ok) {
-                            const govApiData = await govApiResponse.json();
-                            if (govApiData?._embedded?.orgaos?.[0]?.codigoUasg) {
-                                setUasg(govApiData._embedded.orgaos[0].codigoUasg);
-                            } else {
-                                console.warn(`UASG não encontrada para o CNPJ: ${onlyNumbers}`);
-                            }
-                        }
-                    } catch (govError) {
-                        console.error("UASG lookup by CNPJ failed:", govError);
-                    } finally {
-                        setIsFetchingUasg(false);
                     }
                 }
             } catch (err) { console.error(err); }
@@ -157,9 +136,8 @@ export const EditClientModal: React.FC<EditClientModalProps> = ({ client, onClos
                             value={uasg}
                             onChange={(e) => setUasg(e.target.value)}
                             className="block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-white focus:outline-none focus:border-yellow-600"
-                            placeholder="Preenchido via CNPJ"
+                            placeholder="Ex: 123456"
                         />
-                        {isFetchingUasg && <SpinnerIcon className="w-4 h-4 text-yellow-500 absolute right-3 top-8" />}
                     </div>
 
                     <div>
