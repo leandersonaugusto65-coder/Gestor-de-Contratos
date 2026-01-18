@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { XMarkIcon } from './icons/XMarkIcon';
 
@@ -26,14 +25,14 @@ export const ConfirmUpdateModal: React.FC<ConfirmUpdateModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-900/75 dark:bg-black/70 z-50 flex justify-center items-center p-4">
-      <div className="bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl w-full max-w-md animate-fade-in-up">
+    <div className="fixed inset-0 bg-black/70 z-50 flex justify-center items-center p-4">
+      <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl w-full max-md animate-fade-in-up">
         <div className="p-6">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">{title}</h3>
-          <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">{message}</div>
+          <h3 className="text-lg font-bold text-white">{title}</h3>
+          <div className="mt-2 text-sm text-gray-300">{message}</div>
         </div>
-        <div className="bg-slate-100 dark:bg-gray-900 px-6 py-4 flex justify-end space-x-3 rounded-b-lg">
-          <button onClick={onClose} type="button" className="py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-slate-50 dark:bg-gray-700 hover:bg-slate-100 dark:hover:bg-gray-600">
+        <div className="bg-gray-900 px-6 py-4 flex justify-end space-x-3 rounded-b-lg">
+          <button onClick={onClose} type="button" className="py-2 px-4 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600">
             {cancelText}
           </button>
           <button onClick={onConfirm} type="button" className={`inline-flex items-center justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${confirmButtonClass}`}>

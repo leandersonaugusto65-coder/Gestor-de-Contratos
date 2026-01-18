@@ -16,32 +16,20 @@ import { InvoiceCard } from './InvoiceCard';
 import { TrashIcon } from './icons/TrashIcon';
 import { ConfirmUpdateModal } from './ConfirmUpdateModal';
 import { ExportDropdown } from './ExportDropdown';
+import { DocumentArrowDownIcon } from './icons/DocumentArrowDownIcon';
 import { formatCNPJ } from '../utils/cnpj';
 
 interface ContractCardProps {
-  clientId: number;
-  clientName: string;
-  clientUasg: string;
-  clientCnpj?: string;
-  contract: Contract;
-  isReadOnly: boolean;
-  onDeleteItem: (clientId: number, contractId: number, itemId: number) => void;
-  onDeleteContract: (clientId: number, contractId: number) => void;
-  onDeleteCommitment: (clientId: number, contractId: number, commitmentId: number) => void;
-  onDeleteInvoice: (clientId: number, contractId: number, invoiceId: number) => void;
-  onAddItem: (clientId: number, contractId: number, newItem: Omit<ContractItem, 'id'>) => void;
-  onUpdateContract: (clientId: number, contractId: number, updatedData: Partial<Contract>) => void;
-  onAddCommitment: (clientId: number, contractId: number, newCommitment: Omit<Commitment, 'id'>) => void;
-  onAddInvoice: (clientId: number, contractId: number, newInvoice: Omit<Invoice, 'id' | 'isPaid'>) => void;
-  onMarkInvoiceAsPaid: (clientId: number, contractId: number, invoiceId: number) => void;
-  onMarkInvoiceAsUnpaid: (clientId: number, contractId: number, invoiceId: number) => void;
+  clientId: number; clientName: string; clientUasg: string; clientCnpj?: string; contract: Contract; isReadOnly: boolean;
+  onDeleteItem: (cId: number, ctId: number, iId: number) => void; onDeleteContract: (cId: number, ctId: number) => void;
+  onDeleteCommitment: (cId: number, ctId: number, comId: number) => void; onDeleteInvoice: (cId: number, ctId: number, invId: number) => void;
+  onAddItem: (cId: number, ctId: number, newItem: any) => void; onUpdateContract: (cId: number, ctId: number, data: any) => void;
+  onAddCommitment: (cId: number, ctId: number, data: any) => void; onAddInvoice: (cId: number, ctId: number, data: any) => void;
+  onMarkInvoiceAsPaid: (cId: number, ctId: number, invId: number) => void; onMarkInvoiceAsUnpaid: (cId: number, ctId: number, invId: number) => void;
 }
 
-type ActiveView = 'items' | 'commitments' | 'invoices';
-
-const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const formatDate = (date: string) => new Intl.DateTimeFormat('pt-BR').format(new Date(`${date}T00:00:00`));
-
+const formatCurrency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatDate = (d: string) => new Intl.DateTimeFormat('pt-BR').format(new Date(`${d}T00:00:00`));
 
 export const ContractCard: React.FC<ContractCardProps> = (props) => {
   const { clientId, clientName, clientUasg, clientCnpj, contract, isReadOnly, onAddItem, onUpdateContract, onAddCommitment, onAddInvoice, onDeleteItem, onDeleteContract, onDeleteCommitment, onDeleteInvoice, onMarkInvoiceAsPaid, onMarkInvoiceAsUnpaid } = props;
@@ -49,276 +37,144 @@ export const ContractCard: React.FC<ContractCardProps> = (props) => {
   const [isEditingContract, setIsEditingContract] = useState(false);
   const [isAddingCommitment, setIsAddingCommitment] = useState(false);
   const [isAddingInvoice, setIsAddingInvoice] = useState(false);
-  const [activeView, setActiveView] = useState<ActiveView>('items');
+  const [activeView, setActiveView] = useState<'items' | 'commitments' | 'invoices'>('items');
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const summary: ContractSummary = useMemo(() => {
-    const getItem = (id: number) => contract.items.find(i => i.id === id);
     const totalContractValue = contract.items.reduce((acc, item) => acc + (item.unitValue * item.quantityBid), 0);
-    
-    const totalCommittedValue = contract.commitments.reduce((sum, c) => sum + c.items.reduce((itemSum, cItem) => {
-        const item = getItem(cItem.contractItemId);
-        return itemSum + (item ? item.unitValue * cItem.quantity : 0);
-    }, 0), 0);
-    
-    let totalSuppliedValue = 0;
-    let totalPaidValue = 0;
-
+    const totalCommittedValue = contract.commitments.reduce((sum, c) => sum + c.items.reduce((iSum, cItem) => iSum + ((contract.items.find(i => i.id === cItem.contractItemId)?.unitValue || 0) * cItem.quantity), 0), 0);
+    let totalSuppliedValue = 0, totalPaidValue = 0;
     contract.invoices.forEach(inv => {
-        const invoiceValue = inv.items.reduce((itemSum, iItem) => {
-            const item = getItem(iItem.contractItemId);
-            return itemSum + (item ? item.unitValue * iItem.quantitySupplied : 0);
-        }, 0);
-        totalSuppliedValue += invoiceValue;
-        if (inv.isPaid) {
-            totalPaidValue += invoiceValue;
-        }
+        const invValue = inv.items.reduce((iSum, iItem) => iSum + ((contract.items.find(i => i.id === iItem.contractItemId)?.unitValue || 0) * iItem.quantitySupplied), 0);
+        totalSuppliedValue += invValue;
+        if (inv.isPaid) totalPaidValue += invValue;
     });
-
-    const totalToSupplyValue = totalCommittedValue - totalSuppliedValue;
-    const totalToReceiveValue = totalSuppliedValue - totalPaidValue;
-    
-    return { totalContractValue, totalCommittedValue, totalSuppliedValue, totalToSupplyValue, totalPaidValue, totalToReceiveValue };
+    return { totalContractValue, totalCommittedValue, totalSuppliedValue, totalToSupplyValue: totalCommittedValue - totalSuppliedValue, totalPaidValue, totalToReceiveValue: totalSuppliedValue - totalPaidValue };
   }, [contract]);
+  
+  const handleDownloadEdital = () => {
+    if (!contract.biddingType || !contract.uasg || !contract.biddingId) {
+      alert("Informações incompletas para gerar o link do edital.");
+      return;
+    }
 
-  const handleDeleteItemClick = (itemId: number) => {
-    onDeleteItem(clientId, contract.id, itemId);
+    let url = '';
+    if (contract.biddingType === 'pregão') {
+      const uasg = contract.uasg.replace(/\D/g, '');
+      const biddingNumber = contract.biddingId.replace(/\D/g, '');
+      url = `http://comprasnet.gov.br/livre/pregao/ata0.asp?co_no_uasg=${uasg}&numprp=${biddingNumber}`;
+    } else if (contract.biddingType === 'dispensa') {
+      url = `https://www.gov.br/compras/pt-br/acesso-a-sistemas/compras-governamentais/consultas/consulta-de-dispensa-eletronica`;
+    }
+
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const { exportHeaders, exportData, exportFilename, exportPdfTitle } = useMemo(() => {
-    const filename = `Contrato_${contract.biddingId.replace(/[/\\?%*:|"<>]/g, '-')}`;
-    
-    if (activeView === 'items') {
-      const getQuantities = (contractItemId: number) => {
-        const quantityCommitted = contract.commitments.reduce((sum, c) => sum + c.items.filter(i => i.contractItemId === contractItemId).reduce((itemSum, i) => itemSum + i.quantity, 0), 0);
-        const quantitySupplied = contract.invoices.reduce((sum, inv) => sum + inv.items.filter(i => i.contractItemId === contractItemId).reduce((itemSum, i) => itemSum + i.quantitySupplied, 0), 0);
-        return { quantityCommitted, quantitySupplied };
-      }
-      return {
+    const fn = `Contrato_${contract.biddingId.replace(/[/\\?%*:|"<>]/g, '-')}`;
+    if (activeView === 'items') return {
         exportHeaders: ['Item', 'Descrição', 'Valor Unit.', 'Licitada', 'Empenhada', 'Fornecida', 'Saldo Fornecer', 'Saldo Empenhar'],
-        exportData: contract.items.map(item => {
-          const { quantityCommitted, quantitySupplied } = getQuantities(item.id);
-          return [
-            item.item,
-            item.description,
-            formatCurrency(item.unitValue),
-            item.quantityBid,
-            quantityCommitted,
-            quantitySupplied,
-            quantityCommitted - quantitySupplied,
-            item.quantityBid - quantityCommitted
-          ];
-        }),
-        exportFilename: `${filename}_Itens`,
-        exportPdfTitle: `Relatório de Itens - Contrato ${contract.biddingId}`
-      };
-    } else if (activeView === 'commitments') {
-      return {
-        exportHeaders: ['Empenho Nº', 'Data', 'Item Nº', 'Item Descrição', 'Qtd. Empenhada', 'Valor Empenhado'],
-        exportData: contract.commitments.flatMap(c => c.items.map(cItem => {
-          const item = contract.items.find(i => i.id === cItem.contractItemId);
-          return [
-            c.commitmentNumber,
-            formatDate(c.date),
-            item?.item || 'N/A',
-            item?.description || 'Item não encontrado',
-            cItem.quantity,
-            formatCurrency(cItem.quantity * (item?.unitValue || 0))
-          ];
-        })),
-        exportFilename: `${filename}_Empenhos`,
-        exportPdfTitle: `Relatório de Empenhos - Contrato ${contract.biddingId}`
-      };
-    } else { // invoices
-      return {
-        exportHeaders: ['Nota Fiscal Nº', 'Data', 'Status Pgto.', 'Item Nº', 'Item Descrição', 'Qtd. Fornecida', 'Valor Fornecido'],
-        exportData: contract.invoices.flatMap(inv => inv.items.map(iItem => {
-          const item = contract.items.find(i => i.id === iItem.contractItemId);
-          return [
-            inv.invoiceNumber,
-            formatDate(inv.date),
-            inv.isPaid ? 'Pago' : 'Pendente',
-            item?.item || 'N/A',
-            item?.description || 'Item não encontrado',
-            iItem.quantitySupplied,
-            formatCurrency(iItem.quantitySupplied * (item?.unitValue || 0))
-          ];
-        })),
-        exportFilename: `${filename}_NotasFiscais`,
-        exportPdfTitle: `Relatório de Notas Fiscais - Contrato ${contract.biddingId}`
-      }
-    }
+        exportData: contract.items.map(item => [item.item, item.description, formatCurrency(item.unitValue), item.quantityBid, contract.commitments.reduce((s, c) => s + c.items.filter(i => i.contractItemId === item.id).reduce((is, i) => is + i.quantity, 0), 0), contract.invoices.reduce((s, inv) => s + inv.items.filter(i => i.contractItemId === item.id).reduce((is, i) => is + i.quantitySupplied, 0), 0), 0, 0]),
+        exportFilename: `${fn}_Itens`, exportPdfTitle: `Itens - Contrato ${contract.biddingId}`
+    };
+    return { exportHeaders: [], exportData: [], exportFilename: fn, exportPdfTitle: '' };
   }, [activeView, contract]);
 
-  const pdfSubtitle = `Cliente: ${clientName} | UASG: ${clientUasg || 'N/A'} | CNPJ: ${clientCnpj ? formatCNPJ(clientCnpj) : 'N/A'}`;
-
-  const renderActiveView = () => {
-    switch(activeView) {
-      case 'commitments':
-        return (
-          <div className="space-y-4">
-            {contract.commitments.length > 0 ? (
-              contract.commitments.map(c => <CommitmentCard key={c.id} commitment={c} contractItems={contract.items} allCommitments={contract.commitments} allInvoices={contract.invoices} onDelete={() => onDeleteCommitment(clientId, contract.id, c.id)} isReadOnly={isReadOnly}/>)
-            ) : <p className="text-center text-gray-500 dark:text-gray-400 py-8">Nenhum empenho cadastrado.</p>}
-          </div>
-        );
-      case 'invoices':
-        return (
-          <div className="space-y-4">
-            {contract.invoices.length > 0 ? (
-              contract.invoices.map(inv => <InvoiceCard 
-                key={inv.id} 
-                invoice={inv} 
-                contractItems={contract.items} 
-                onMarkAsPaid={() => onMarkInvoiceAsPaid(clientId, contract.id, inv.id)}
-                onMarkAsUnpaid={() => onMarkInvoiceAsUnpaid(clientId, contract.id, inv.id)}
-                onDelete={() => onDeleteInvoice(clientId, contract.id, inv.id)}
-                isReadOnly={isReadOnly}
-              />)
-            ) : <p className="text-center text-gray-500 dark:text-gray-400 py-8">Nenhuma nota fiscal cadastrada.</p>}
-          </div>
-        );
-      case 'items':
-      default:
-        return <ContractItemsTable contract={contract} onDeleteItem={handleDeleteItemClick} isReadOnly={isReadOnly} />;
-    }
-  }
-
-  const getActiveButton = () => {
-    if (isReadOnly) return null;
-    switch(activeView) {
-        case 'commitments': return <button onClick={() => setIsAddingCommitment(true)} className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition-transform duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-75 whitespace-nowrap"><PlusIcon className="w-5 h-5" /> Adicionar Empenho</button>;
-        case 'invoices': return <button onClick={() => setIsAddingInvoice(true)} className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition-transform duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-75 whitespace-nowrap"><PlusIcon className="w-5 h-5" /> Adicionar Nota Fiscal</button>;
-        case 'items': return <button onClick={() => setIsAddingItem(true)} className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition-transform duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-75 whitespace-nowrap"><PlusIcon className="w-5 h-5" /> Adicionar Item</button>;
-    }
-  }
-
-  const TabButton: React.FC<{view: ActiveView, label: string, icon: React.ReactNode}> = ({view, label, icon}) => (
+  const TabButton: React.FC<{view: any, label: string, icon: any}> = ({view, label, icon}) => (
       <button 
         onClick={() => setActiveView(view)} 
-        className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap ${
-            activeView === view ? 'border-yellow-600 text-yellow-600' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-gray-700'
+        className={`relative flex items-center gap-2 px-6 py-3 text-xs font-bold uppercase tracking-wider rounded-xl transition-all duration-300 border-2 overflow-hidden ${
+          activeView === view 
+          ? 'bg-yellow-600/10 border-yellow-500 text-white shadow-[0_0_15px_rgba(202,138,4,0.15)]' 
+          : 'bg-transparent border-transparent text-gray-500 hover:text-gray-300 hover:bg-gray-800/40'
         }`}
       >
-          {React.isValidElement(icon) ? React.cloneElement(icon as React.ReactElement<any>, { className: 'w-4 h-4 sm:w-5 sm:h-5' }) : null}
-          <span>{label}</span>
+          {activeView === view && <div className="absolute inset-0 bg-gradient-to-r from-yellow-600/5 to-transparent" />}
+          {React.cloneElement(icon as any, { className: `w-5 h-5 transition-colors ${activeView === view ? 'text-yellow-500' : 'text-gray-600'}` })}
+          <span className="relative z-10">{label}</span>
       </button>
   );
 
-  return (
-    <>
-      <div className="bg-slate-50 dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-300 hover:shadow-2xl hover:border-yellow-600/20">
-        <div className="p-6 bg-slate-100 dark:bg-gray-900 text-gray-900 dark:text-white">
-          <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
-            <div className="flex items-start gap-3 flex-1 min-w-0">
-              <FileTextIcon className="w-8 h-8 text-yellow-500 flex-shrink-0 mt-1" />
-              <div className="flex justify-between items-start gap-4 flex-1 min-w-0">
-                <div className="flex-1 min-w-0">
-                    <h2 className="text-lg font-bold" title={contract.biddingId || 'Não especificado'}>Licitação: {contract.biddingId || 'Não especificado'}</h2>
-                    <div className='text-sm text-gray-700 dark:text-gray-300 space-y-1 mt-1'>
-                      <p>Criado em: {formatDate(contract.creationDate)}</p>
-                      <div className="flex flex-wrap gap-x-4">
-                        {contract.uasg && <p><span className="text-gray-500">UASG:</span> {contract.uasg}</p>}
-                        {contract.cnpj && <p><span className="text-gray-500">CNPJ:</span> {contract.cnpj}</p>}
-                      </div>
-                    </div>
-                </div>
+  const ActionButton: React.FC<{onClick: () => void, label: string}> = ({onClick, label}) => (
+    <button 
+        onClick={onClick} 
+        className="group flex items-center gap-2 bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 hover:border-yellow-600/50 text-white font-bold py-2.5 px-5 rounded-xl transition-all duration-300 shadow-lg hover:shadow-yellow-600/20 active:scale-95"
+    >
+        <PlusIcon className="w-5 h-5 text-yellow-500 transition-transform group-hover:rotate-90" />
+        <span className="text-sm">{label}</span>
+    </button>
+  );
+  
+  const biddingTypeLabel = contract.biddingType === 'pregão' ? 'Pregão Eletrônico' : 'Dispensa Eletrônica';
 
-                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 sm:gap-2 flex-shrink-0">
-                    {!isReadOnly && (
-                        <div className="flex items-center gap-1">
-                            <button 
-                                onClick={() => setIsEditingContract(true)}
-                                className="p-1 text-gray-500 dark:text-gray-400 hover:text-yellow-500 transition-colors"
-                                title="Editar cadastro do contrato"
-                            >
-                                <PencilIcon className="w-4 h-4" />
-                            </button>
-                            <button 
-                                onClick={() => setIsDeleteConfirmOpen(true)}
-                                className="p-1 text-gray-500 dark:text-gray-400 hover:text-red-500 transition-colors"
-                                title="Excluir contrato"
-                            >
-                                <TrashIcon className="w-4 h-4" />
-                            </button>
-                        </div>
-                    )}
-                    <ExportDropdown
-                        headers={exportHeaders}
-                        data={exportData}
-                        filenamePrefix={exportFilename}
-                        pdfTitle={exportPdfTitle}
-                        pdfSubtitle={pdfSubtitle}
-                        variant="icon"
-                    />
-                </div>
+  const validityDate = useMemo(() => {
+    if (!contract.creationDate) return null;
+    const date = new Date(`${contract.creationDate}T00:00:00`);
+    date.setFullYear(date.getFullYear() + 1);
+    return new Intl.DateTimeFormat('pt-BR').format(date);
+  }, [contract.creationDate]);
+
+  return (
+    <div className="bg-gray-800 rounded-2xl shadow-xl border border-gray-700 overflow-hidden mb-8 transition-all hover:border-gray-600">
+        <div className="p-6 bg-gray-900/80 backdrop-blur-sm text-white flex flex-col sm:flex-row justify-between items-start gap-4">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-yellow-600/10 rounded-2xl border border-yellow-600/20">
+                <FileTextIcon className="w-8 h-8 text-yellow-500" />
+              </div>
+              <div>
+                  <h2 className="text-xl font-bold tracking-tight">{biddingTypeLabel}: {contract.biddingId}</h2>
+                  <div className='text-sm text-gray-400 mt-1 flex flex-wrap gap-x-4 gap-y-1 items-center'>
+                    <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-yellow-600" /> Criado em: {formatDate(contract.creationDate)}</span>
+                    {validityDate && <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-green-500" /> Vigência até: {validityDate}</span>}
+                    <span className="opacity-60">UASG: {contract.uasg} | CNPJ: {contract.cnpj}</span>
+                  </div>
               </div>
             </div>
-            <div className="w-full sm:w-auto flex justify-start sm:justify-end">
-                {getActiveButton()}
-            </div>
-          </div>
+            {!isReadOnly && (
+              <div className="flex gap-2">
+                <button onClick={handleDownloadEdital} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all" title="Baixar Edital"><DocumentArrowDownIcon className="w-5 h-5"/></button>
+                <button onClick={() => setIsEditingContract(true)} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all"><PencilIcon className="w-5 h-5" /></button>
+                <button onClick={() => setIsDeleteConfirmOpen(true)} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-red-500 hover:border-red-600/30 transition-all"><TrashIcon className="w-5 h-5" /></button>
+                <ExportDropdown headers={exportHeaders} data={exportData} filenamePrefix={exportFilename} pdfTitle={exportPdfTitle} />
+              </div>
+            )}
         </div>
 
-        <div className="border-b border-gray-200 dark:border-gray-700 px-2 sm:px-6">
-            <nav className="-mb-px flex space-x-2 sm:space-x-4 overflow-x-auto scrollbar-hide" aria-label="Tabs">
-                <TabButton view="items" label="Itens do Contrato" icon={<FileTextIcon />} />
+        <div className="bg-gray-900/40 px-6 pt-4 border-b border-gray-700/50">
+            <nav className="flex space-x-2 overflow-x-auto pb-4 scrollbar-hide">
+                <TabButton view="items" label="Itens" icon={<FileTextIcon />} />
                 <TabButton view="commitments" label="Empenhos" icon={<ClipboardDocumentListIcon />} />
                 <TabButton view="invoices" label="Notas Fiscais" icon={<ClipboardDocumentCheckIcon />} />
             </nav>
         </div>
 
-        <div className="p-6">
-          {renderActiveView()}
+        <div className="p-6 bg-gray-800/20">
+          <div className="animate-fade-in">
+            {activeView === 'items' && <ContractItemsTable contract={contract} onDeleteItem={(id) => onDeleteItem(clientId, contract.id, id)} isReadOnly={isReadOnly} />}
+            {activeView === 'commitments' && <div className="space-y-4">{contract.commitments.map(c => <CommitmentCard key={c.id} commitment={c} contractItems={contract.items} allCommitments={contract.commitments} allInvoices={contract.invoices} onDelete={() => onDeleteCommitment(clientId, contract.id, c.id)} isReadOnly={isReadOnly}/>)}</div>}
+            {activeView === 'invoices' && <div className="space-y-4">{contract.invoices.map(inv => <InvoiceCard key={inv.id} invoice={inv} contractItems={contract.items} onMarkAsPaid={() => onMarkInvoiceAsPaid(clientId, contract.id, inv.id)} onMarkAsUnpaid={() => onMarkInvoiceAsUnpaid(clientId, contract.id, inv.id)} onDelete={() => onDeleteInvoice(clientId, contract.id, inv.id)} isReadOnly={isReadOnly} />)}</div>}
+          </div>
+
+          {!isReadOnly && (
+            <div className="mt-8 flex justify-end">
+                {activeView === 'items' && <ActionButton onClick={() => setIsAddingItem(true)} label="Novo Item" />}
+                {activeView === 'commitments' && <ActionButton onClick={() => setIsAddingCommitment(true)} label="Novo Empenho" />}
+                {activeView === 'invoices' && <ActionButton onClick={() => setIsAddingInvoice(true)} label="Nova Nota" />}
+            </div>
+          )}
         </div>
 
-        <div className="p-6 bg-slate-100 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700">
+        <div className="p-6 bg-gray-900/60 border-t border-gray-700/50">
           <ContractSummaryView summary={summary} />
         </div>
-      </div>
-      
-      {isEditingContract && (
-        <EditContractModal
-          contract={contract}
-          onClose={() => setIsEditingContract(false)}
-          onUpdate={(data) => {
-            onUpdateContract(clientId, contract.id, data);
-            setIsEditingContract(false);
-          }}
-        />
-      )}
-      
-      <ConfirmUpdateModal
-        isOpen={isDeleteConfirmOpen}
-        onClose={() => setIsDeleteConfirmOpen(false)}
-        onConfirm={() => {
-            onDeleteContract(clientId, contract.id);
-            setIsDeleteConfirmOpen(false);
-        }}
-        title="Confirmar Exclusão do Contrato"
-        message={
-          <>
-            <p className="mb-2">Tem certeza que deseja excluir o contrato da licitação <strong>{contract.biddingId || 'N/A'}</strong>?</p>
-            <p className="font-bold text-red-500">Atenção: Todos os seus itens, empenhos e notas fiscais serão removidos permanentemente. Esta ação é irreversível.</p>
-          </>
-        }
-        confirmText="Sim, Excluir Contrato"
-        confirmButtonClass="bg-red-600 hover:bg-red-700"
-      />
 
-      {isAddingItem && <AddItemForm onClose={() => setIsAddingItem(false)} onAddItem={(newItem) => { onAddItem(clientId, contract.id, newItem); setIsAddingItem(false); }} />}
-      {isAddingCommitment && <AddCommitmentForm contract={contract} onClose={() => setIsAddingCommitment(false)} onAddCommitment={(newCommitment) => { onAddCommitment(clientId, contract.id, newCommitment); setIsAddingCommitment(false); }} />}
-      {isAddingInvoice && <AddInvoiceForm contract={contract} onClose={() => setIsAddingInvoice(false)} onAddInvoice={(newInvoice) => { onAddInvoice(clientId, contract.id, newInvoice); setIsAddingInvoice(false); }} />}
-
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-        }
-        .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-      `}</style>
-    </>
+        {isEditingContract && <EditContractModal contract={contract} onClose={() => setIsEditingContract(false)} onUpdate={(d) => { onUpdateContract(clientId, contract.id, d); setIsEditingContract(false); }} />}
+        <ConfirmUpdateModal isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)} onConfirm={() => onDeleteContract(clientId, contract.id)} title="Excluir Contrato" message="Deseja realmente excluir este contrato?" />
+        {isAddingItem && <AddItemForm onClose={() => setIsAddingItem(false)} onAddItem={(i) => onAddItem(clientId, contract.id, i)} />}
+        {isAddingCommitment && <AddCommitmentForm contract={contract} onClose={() => setIsAddingCommitment(false)} onAddCommitment={(c) => onAddCommitment(clientId, contract.id, c)} />}
+        {isAddingInvoice && <AddInvoiceForm contract={contract} onClose={() => setIsAddingInvoice(false)} onAddInvoice={(i) => onAddInvoice(clientId, contract.id, i)} />}
+    </div>
   );
 };

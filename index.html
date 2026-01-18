@@ -15,7 +15,6 @@
     <link rel="manifest" href="/manifest.json">
     <script>
       tailwind.config = {
-        darkMode: 'class', // Habilita o modo escuro baseado em classe
         theme: {
           extend: {
             fontFamily: {
@@ -31,9 +30,26 @@
         font-family: 'Inter', sans-serif;
         -webkit-tap-highlight-color: transparent;
         overscroll-behavior-y: contain;
+        background-color: #000000;
+        color: #e5e7eb;
       }
       .font-title {
         font-family: 'Playfair Display', serif;
+      }
+      /* Custom scrollbar for dark theme */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #111827;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #374151;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #4b5563;
       }
     </style>
   <script type="importmap">
@@ -50,7 +66,7 @@
 }
 </script>
 </head>
-  <body class="bg-slate-100 dark:bg-black text-gray-800 dark:text-gray-200">
+  <body class="bg-black">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

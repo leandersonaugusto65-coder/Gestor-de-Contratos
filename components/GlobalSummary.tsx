@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { GlobalSummaryData } from '../types';
 import { DocumentChartBarIcon } from './icons/DocumentChartBarIcon';
@@ -10,77 +9,36 @@ import { WalletIcon } from './icons/WalletIcon';
 interface GlobalSummaryProps {
   summary: GlobalSummaryData;
   onReceivablesClick?: () => void;
+  onBreakdownToggle: (type: 'licitado' | 'empenhado' | 'fornecido' | 'saldoFornecer') => void;
+  activeBreakdown: 'licitado' | 'empenhado' | 'fornecido' | 'saldoFornecer' | null;
 }
 
-interface SummaryCardProps {
-    icon: React.ReactElement<{ className?: string }>;
-    title: string;
-    value: string;
-    colorClasses: {
-        bg: string;
-        text: string;
-        icon: string;
-    };
-    onClick?: () => void;
-}
-
-const SummaryCard: React.FC<SummaryCardProps> = ({ icon, title, value, colorClasses, onClick }) => (
+const SummaryCard: React.FC<{ icon: any; title: string; value: string; colorClasses: any; onClick?: () => void; isActive?: boolean }> = ({ icon, title, value, colorClasses, onClick, isActive }) => (
   <div 
-    className={`bg-slate-50 dark:bg-gray-800 p-3 sm:p-4 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 flex items-center space-x-2 sm:space-x-3 transition-all duration-300 hover:scale-105 hover:bg-slate-100 dark:hover:bg-gray-700/50 ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-offset-2 hover:ring-offset-gray-100 dark:hover:ring-offset-black' : ''}`}
+    className={`group bg-gray-900/40 p-4 rounded-2xl shadow-lg border border-gray-800 flex items-center space-x-4 transition-all duration-300 hover:scale-[1.03] hover:bg-gray-800/60 hover:border-gray-700 ${onClick ? 'cursor-pointer' : ''} ${isActive ? 'ring-2 ring-yellow-500/80 shadow-[0_0_20px_rgba(202,138,4,0.3)]' : ''}`}
     onClick={onClick}
-    style={{'--tw-ring-color': colorClasses.text.replace('text-', 'bg-').replace('-600', '-400')} as React.CSSProperties}
   >
-    <div className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center ${colorClasses.bg}`}>
-      {React.cloneElement(icon, { className: `w-5 h-5 sm:w-6 sm:h-6 ${colorClasses.icon}` })}
+    <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:rotate-6 ${colorClasses.bg}`}>
+      {React.cloneElement(icon, { className: `w-7 h-7 ${colorClasses.icon}` })}
     </div>
     <div className="min-w-0 flex-1 overflow-hidden">
-      <p className="text-[9px] sm:text-[10px] font-medium text-gray-500 dark:text-gray-400 truncate uppercase tracking-wider mb-0.5">{title}</p>
-      <p className={`text-sm sm:text-base lg:text-lg font-bold tracking-tight whitespace-nowrap leading-none ${colorClasses.text}`}>
+      <p className="text-[10px] font-bold text-gray-500 truncate uppercase tracking-widest mb-1">{title}</p>
+      <p className={`text-lg sm:text-xl font-black tracking-tight whitespace-nowrap leading-none ${colorClasses.text}`}>
         {value}
       </p>
     </div>
   </div>
 );
 
-
-export const GlobalSummary: React.FC<GlobalSummaryProps> = ({ summary, onReceivablesClick }) => {
-    const formatCurrency = (value: number) => {
-        return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    };
-
+export const GlobalSummary: React.FC<GlobalSummaryProps> = ({ summary, onReceivablesClick, onBreakdownToggle, activeBreakdown }) => {
+    const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     return (
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-4">
-            <SummaryCard
-                icon={<DocumentChartBarIcon />}
-                title="Total Licitado"
-                value={formatCurrency(summary.totalBidValue)}
-                colorClasses={{ bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-600 dark:text-yellow-500', icon: 'text-yellow-500 dark:text-yellow-400' }}
-            />
-             <SummaryCard
-                icon={<StampIcon />}
-                title="Total Empenhado"
-                value={formatCurrency(summary.totalCommittedValue)}
-                colorClasses={{ bg: 'bg-amber-100 dark:bg-yellow-900/30', text: 'text-amber-600 dark:text-yellow-400', icon: 'text-amber-500 dark:text-yellow-300' }}
-            />
-             <SummaryCard
-                icon={<TruckIcon />}
-                title="Total Fornecido"
-                value={formatCurrency(summary.totalSuppliedValue)}
-                colorClasses={{ bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-600 dark:text-green-400', icon: 'text-green-500 dark:text-green-300' }}
-            />
-             <SummaryCard
-                icon={<HourglassIcon />}
-                title="Saldo a Fornecer"
-                value={formatCurrency(summary.balanceToSupplyValue)}
-                colorClasses={{ bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-600 dark:text-orange-400', icon: 'text-orange-500 dark:text-orange-300' }}
-            />
-             <SummaryCard
-                icon={<WalletIcon />}
-                title="Valor a Receber"
-                value={formatCurrency(summary.totalToReceiveValue)}
-                colorClasses={{ bg: 'bg-violet-100 dark:bg-violet-900/30', text: 'text-violet-600 dark:text-violet-400', icon: 'text-violet-500 dark:text-violet-300' }}
-                onClick={onReceivablesClick}
-            />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <SummaryCard icon={<DocumentChartBarIcon />} title="Total Licitado" value={formatCurrency(summary.totalBidValue)} colorClasses={{ bg: 'bg-yellow-500/10', text: 'text-yellow-500', icon: 'text-yellow-500' }} onClick={() => onBreakdownToggle('licitado')} isActive={activeBreakdown === 'licitado'} />
+            <SummaryCard icon={<StampIcon />} title="Total Empenhado" value={formatCurrency(summary.totalCommittedValue)} colorClasses={{ bg: 'bg-amber-500/10', text: 'text-amber-500', icon: 'text-amber-500' }} onClick={() => onBreakdownToggle('empenhado')} isActive={activeBreakdown === 'empenhado'} />
+            <SummaryCard icon={<TruckIcon />} title="Total Fornecido" value={formatCurrency(summary.totalSuppliedValue)} colorClasses={{ bg: 'bg-emerald-500/10', text: 'text-emerald-500', icon: 'text-emerald-500' }} onClick={() => onBreakdownToggle('fornecido')} isActive={activeBreakdown === 'fornecido'} />
+            <SummaryCard icon={<HourglassIcon />} title="Saldo a Fornecer" value={formatCurrency(summary.balanceToSupplyValue)} colorClasses={{ bg: 'bg-orange-500/10', text: 'text-orange-500', icon: 'text-orange-500' }} onClick={() => onBreakdownToggle('saldoFornecer')} isActive={activeBreakdown === 'saldoFornecer'} />
+            <SummaryCard icon={<WalletIcon />} title="Valor a Receber" value={formatCurrency(summary.totalToReceiveValue)} colorClasses={{ bg: 'bg-indigo-500/10', text: 'text-indigo-500', icon: 'text-indigo-500' }} onClick={onReceivablesClick} />
         </div>
     );
 };

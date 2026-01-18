@@ -1,4 +1,3 @@
-
 import React, { useRef } from 'react';
 import { ArrowUpTrayIcon } from './icons/ArrowUpTrayIcon';
 
@@ -17,10 +16,10 @@ export const RestoreButton: React.FC<RestoreButtonProps> = ({ onRestore }) => {
     <>
       <button
         onClick={handleRestoreClick}
-        className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+        className="p-2 rounded-full hover:bg-gray-700 transition-colors"
         title="Restaurar Backup (Importar)"
       >
-        <ArrowUpTrayIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700 dark:text-gray-300" />
+        <ArrowUpTrayIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-300" />
       </button>
       <input
         type="file"

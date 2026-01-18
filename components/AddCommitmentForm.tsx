@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import type { Contract, Commitment } from '../types';
 
@@ -57,6 +56,8 @@ export const AddCommitmentForm: React.FC<AddCommitmentFormProps> = ({ contract, 
             date,
             items: itemsToCommit
         });
+        // Fecha o modal após adicionar
+        onClose();
     };
 
     return (
@@ -137,9 +138,9 @@ export const AddCommitmentForm: React.FC<AddCommitmentFormProps> = ({ contract, 
                     cursor: not-allowed;
                 }
                 .btn-primary {
-                    display: inline-flex; justify-content: center; padding: 0.5rem 1rem; border: 1px solid transparent; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); font-size: 0.875rem; font-weight: 500; border-radius: 0.375rem; color: white; background-color: #ca8a04;
+                    display: inline-flex; justify-content: center; padding: 0.5rem 1rem; border: 1px solid transparent; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); font-size: 0.875rem; font-weight: 500; border-radius: 0.375rem; color: black; background-color: #eab308;
                 }
-                .btn-primary:hover { background-color: #a16207; }
+                .btn-primary:hover { background-color: #ca8a04; }
                 .btn-secondary {
                     padding: 0.5rem 1rem; border: 1px solid #4b5563; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); font-size: 0.875rem; font-weight: 500; color: #d1d5db; background-color: #374151;
                 }

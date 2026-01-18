@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import type { Client, Contract } from '../types';
 import { useDebounce } from '../hooks/useDebounce';
@@ -13,6 +14,7 @@ interface AddContractFormProps {
 
 export const AddContractForm: React.FC<AddContractFormProps> = ({ client, onClose, onAddContract }) => {
     const [biddingId, setBiddingId] = useState('');
+    const [biddingType, setBiddingType] = useState<'pregão' | 'dispensa'>('pregão');
     const [creationDate, setCreationDate] = useState(new Date().toISOString().split('T')[0]);
     const [cnpj, setCnpj] = useState(client.cnpj ? formatCNPJ(client.cnpj) : '');
     const [uasg, setUasg] = useState(client.uasg || '');
@@ -89,6 +91,7 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ client, onClos
             cep: cep.trim(),
             contractData: {
                 biddingId: biddingId.trim(),
+                biddingType,
                 creationDate: creationDate,
                 cnpj: stripCNPJ(cnpj),
                 uasg: stripCNPJ(uasg),
@@ -106,6 +109,14 @@ export const AddContractForm: React.FC<AddContractFormProps> = ({ client, onClos
                         <div className="bg-gray-900 p-3 rounded border border-gray-700">
                             <label className="block text-xs font-medium text-gray-500 uppercase">Cliente Atual</label>
                             <p className="text-white font-bold">{client.name}</p>
+                        </div>
+                        
+                        <div>
+                            <label htmlFor="biddingType" className="block text-sm font-medium text-gray-400 mb-1">Tipo de Licitação</label>
+                            <select id="biddingType" value={biddingType} onChange={(e) => setBiddingType(e.target.value as 'pregão' | 'dispensa')} className="block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-white focus:outline-none focus:border-yellow-600">
+                                <option value="pregão">Pregão Eletrônico</option>
+                                <option value="dispensa">Dispensa Eletrônica</option>
+                            </select>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">

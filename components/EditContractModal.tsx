@@ -13,6 +13,7 @@ interface EditContractModalProps {
 
 export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, onClose, onUpdate }) => {
     const [biddingId, setBiddingId] = useState(contract.biddingId);
+    const [biddingType, setBiddingType] = useState(contract.biddingType || 'pregão');
     const [creationDate, setCreationDate] = useState(contract.creationDate);
     const [cnpj, setCnpj] = useState(contract.cnpj ? formatCNPJ(contract.cnpj) : '');
     const [uasg, setUasg] = useState(contract.uasg || '');
@@ -126,6 +127,7 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
         }
         onUpdate({
             biddingId: biddingId.trim(),
+            biddingType,
             creationDate,
             cnpj: stripCNPJ(cnpj),
             uasg: stripCNPJ(uasg),
@@ -142,6 +144,14 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
                     </button>
                 </header>
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                     <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Tipo de Licitação</label>
+                        <select value={biddingType} onChange={(e) => setBiddingType(e.target.value as 'pregão' | 'dispensa')} className="block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-white focus:outline-none focus:border-yellow-600">
+                            <option value="pregão">Pregão Eletrônico</option>
+                            <option value="dispensa">Dispensa Eletrônica</option>
+                        </select>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div className="relative">
                             <label className="block text-xs font-medium text-gray-500 uppercase mb-1">UASG</label>
@@ -203,7 +213,7 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({ contract, 
                         <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors">
                             Cancelar
                         </button>
-                        <button type="submit" className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-bold rounded-lg shadow-lg transition-all">
+                        <button type="submit" className="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg shadow-lg transition-all">
                             Salvar Alterações
                         </button>
                     </div>

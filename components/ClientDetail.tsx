@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import type { Client, Contract, ContractItem, Commitment, Invoice } from '../types';
 import { ContractCard } from './ContractCard';
@@ -59,16 +58,18 @@ export const ClientDetail: React.FC<ClientDetailProps> = (props) => {
     }
 
     return (
-        <div>
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
-                <button onClick={onBack} className="flex items-center gap-2 text-sm font-medium text-yellow-600 hover:text-yellow-500 transition-colors self-start">
-                    <ArrowLeftIcon className="w-5 h-5" />
-                    Voltar para o Dashboard
+        <div className="animate-fade-in">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-8 gap-4">
+                <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-gray-400 hover:text-yellow-500 transition-all group">
+                    <div className="p-2 bg-gray-900 rounded-xl border border-gray-800 group-hover:border-yellow-600/30">
+                        <ArrowLeftIcon className="w-5 h-5" />
+                    </div>
+                    Voltar ao Dashboard
                 </button>
                  {!isReadOnly && (
                     <button
                         onClick={() => setIsAddingContract(true)}
-                        className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition-transform duration-200 hover:scale-105 self-end sm:self-center"
+                        className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 px-6 rounded-2xl transition-all duration-300 shadow-[0_4px_15px_rgba(234,179,8,0.3)] hover:shadow-[0_6px_25px_rgba(234,179,8,0.4)] active:scale-95"
                     >
                         <PlusIcon className="w-5 h-5" />
                         Novo Contrato
@@ -76,39 +77,54 @@ export const ClientDetail: React.FC<ClientDetailProps> = (props) => {
                  )}
             </div>
 
-            <div className="relative mb-8 p-6 bg-slate-100 dark:bg-gray-800 rounded-lg shadow-inner border border-gray-200 dark:border-gray-700 group">
-                 <div className="flex justify-between items-start">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{client.name}</h2>
-                    {!isReadOnly && (
-                        <div className="flex items-center gap-2">
-                            <button 
-                                onClick={() => setIsEditingClient(true)}
-                                className="p-2 text-gray-500 dark:text-gray-400 hover:text-yellow-500 transition-colors bg-slate-200 dark:bg-gray-900/50 rounded-lg"
-                                title="Editar cadastro do cliente"
-                            >
-                                <PencilIcon className="w-5 h-5" />
-                            </button>
-                            <button 
-                                onClick={() => setIsDeleteClientConfirmOpen(true)}
-                                className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-500 transition-colors bg-slate-200 dark:bg-gray-900/50 rounded-lg"
-                                title="Excluir cliente"
-                            >
-                                <TrashIcon className="w-5 h-5" />
-                            </button>
-                        </div>
-                    )}
-                 </div>
+            <div className="relative mb-10 p-8 bg-gray-900 rounded-3xl shadow-2xl border border-gray-800 overflow-hidden">
+                 {/* Decorative background glow */}
+                 <div className="absolute -top-24 -right-24 w-64 h-64 bg-yellow-600/10 rounded-full blur-3xl pointer-events-none" />
                  
-                 <div className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                    <p><span className="font-semibold text-gray-700 dark:text-gray-300">UASG:</span> {client.uasg}</p>
-                    {client.cnpj && <p><span className="font-semibold text-gray-700 dark:text-gray-300">CNPJ:</span> {client.cnpj}</p>}
-                    {client.address && <p><span className="font-semibold text-gray-700 dark:text-gray-300">Endereço:</span> {client.address}</p>}
-                    {client.cep && <p><span className="font-semibold text-gray-700 dark:text-gray-300">CEP:</span> {client.cep}</p>}
-                </div>
-                 <p className="text-gray-500 dark:text-gray-400 mt-3">{client.contracts.length} contrato(s) ativo(s)</p>
+                 <div className="relative z-10">
+                    <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-yellow-600">Ficha do Cliente</span>
+                            <h2 className="text-3xl font-bold text-gray-100">{client.name}</h2>
+                        </div>
+                        {!isReadOnly && (
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={() => setIsEditingClient(true)}
+                                    className="p-3 text-gray-400 hover:text-yellow-500 transition-all bg-black/40 border border-gray-800 rounded-xl hover:border-yellow-600/30"
+                                    title="Editar cadastro"
+                                >
+                                    <PencilIcon className="w-5 h-5" />
+                                </button>
+                                <button 
+                                    onClick={() => setIsDeleteClientConfirmOpen(true)}
+                                    className="p-3 text-gray-400 hover:text-red-500 transition-all bg-black/40 border border-gray-800 rounded-xl hover:border-red-600/30"
+                                    title="Excluir cliente"
+                                >
+                                    <TrashIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-sm">
+                        <div className="p-4 bg-black/30 rounded-2xl border border-gray-800/50">
+                            <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">UASG</p>
+                            <p className="text-gray-200 font-mono">{client.uasg}</p>
+                        </div>
+                        <div className="p-4 bg-black/30 rounded-2xl border border-gray-800/50">
+                            <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">CNPJ</p>
+                            <p className="text-gray-200 font-mono">{client.cnpj || '---'}</p>
+                        </div>
+                        <div className="col-span-1 lg:col-span-2 p-4 bg-black/30 rounded-2xl border border-gray-800/50">
+                            <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Endereço Principal</p>
+                            <p className="text-gray-200 truncate">{client.address || 'Não informado'} {client.cep ? `| CEP: ${client.cep}` : ''}</p>
+                        </div>
+                    </div>
+                 </div>
             </div>
            
-            <div className="space-y-8">
+            <div className="space-y-10">
                 {client.contracts.length > 0 ? (
                     client.contracts.map(contract => (
                         <ContractCard 
@@ -132,9 +148,10 @@ export const ClientDetail: React.FC<ClientDetailProps> = (props) => {
                         />
                     ))
                 ) : (
-                    <div className="text-center py-12 bg-slate-100 dark:bg-gray-800 rounded-lg shadow-inner">
-                        <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200">Nenhum contrato cadastrado</h3>
-                        <p className="text-gray-500 dark:text-gray-400 mt-2">Clique em "Novo Contrato" para adicionar a primeira licitação para este cliente.</p>
+                    <div className="text-center py-20 bg-gray-900/50 rounded-3xl border-2 border-dashed border-gray-800">
+                        <PlusIcon className="w-12 h-12 text-gray-700 mx-auto mb-4" />
+                        <h3 className="text-xl font-bold text-gray-400">Nenhum contrato ativo</h3>
+                        <p className="text-gray-500 mt-1 max-w-xs mx-auto">Comece adicionando a primeira licitação para este cliente clicando no botão acima.</p>
                     </div>
                 )}
             </div>
@@ -162,15 +179,15 @@ export const ClientDetail: React.FC<ClientDetailProps> = (props) => {
                 isOpen={isDeleteClientConfirmOpen}
                 onClose={() => setIsDeleteClientConfirmOpen(false)}
                 onConfirm={() => onDeleteClient(client.id)}
-                title="Confirmar Exclusão do Cliente"
+                title="Confirmar Exclusão"
                 message={
                   <>
-                    <p className="mb-2">Tem certeza que deseja excluir o cliente <strong>{client.name}</strong>?</p>
-                    <p className="font-bold text-red-500">Atenção: Todos os contratos e dados financeiros associados a este cliente serão permanentemente removidos. Esta ação é irreversível.</p>
+                    <p className="mb-2 text-gray-300">Tem certeza que deseja remover permanentemente o cliente <strong>{client.name}</strong>?</p>
+                    <p className="text-sm bg-red-500/10 p-3 rounded-xl border border-red-500/20 text-red-400 font-medium">Atenção: Todos os dados financeiros, contratos, empenhos e notas associados serão perdidos.</p>
                   </>
                 }
-                confirmText="Sim, Excluir Cliente"
-                confirmButtonClass="bg-red-600 hover:bg-red-700"
+                confirmText="Excluir Cliente"
+                confirmButtonClass="bg-red-600 hover:bg-red-700 shadow-[0_0_15px_rgba(220,38,38,0.3)]"
             />
         </div>
     );

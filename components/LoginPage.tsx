@@ -27,8 +27,9 @@ type ActiveTab = 'login' | 'register';
 export const LoginPage: React.FC<LoginPageProps> = ({ supabaseClient }) => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('login');
   
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('oficinacomprasnet@gmail.com');
+  const [password, setPassword] = useState('94191793');
+  
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -61,7 +62,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ supabaseClient }) => {
 
     if (error) {
         if (error.message.includes('Email not confirmed')) {
-            setError('Seu e-mail ainda não foi confirmado. Por favor, verifique sua caixa de entrada.');
+            setError('Seu e-mail ainda não foi confirmado. Verifique sua caixa de entrada.');
         } else if (error.message.includes('Invalid login credentials')) {
             setError('E-mail ou senha inválidos.');
         } else {
@@ -95,7 +96,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ supabaseClient }) => {
     if (error) {
         setError(error.message);
     } else {
-        setMessage('Cadastro realizado! Verifique seu e-mail (e a caixa de spam) para confirmar sua conta antes de entrar.');
+        setMessage('Cadastro realizado! Verifique seu e-mail para confirmar sua conta.');
         setActiveTab('login');
         resetFormState();
     }
@@ -107,31 +108,32 @@ export const LoginPage: React.FC<LoginPageProps> = ({ supabaseClient }) => {
     <button
       type="button"
       onClick={() => handleTabChange(tab)}
-      className={`w-full py-3 text-sm font-semibold leading-5 focus:outline-none transition-colors duration-300 ${
+      className={`relative w-full py-3 text-sm font-bold uppercase tracking-widest transition-all duration-300 rounded-xl border-2 ${
         activeTab === tab 
-          ? 'text-amber-500 border-b-2 border-amber-500' 
-          : 'text-slate-400 hover:text-slate-200'
+          ? 'bg-yellow-600/10 border-yellow-500 text-white shadow-[0_0_15px_rgba(202,138,4,0.15)]' 
+          : 'bg-transparent border-transparent text-gray-500 hover:text-gray-300'
         }`
       }
     >
-      {children}
+      {activeTab === tab && <div className="absolute inset-0 bg-gradient-to-r from-yellow-600/5 to-transparent" />}
+      <span className="relative z-10">{children}</span>
     </button>
   );
 
   return (
     <>
       <div className="min-h-screen flex flex-col justify-center items-center bg-black p-4 font-sans">
-        <div className="w-full max-w-sm mx-auto bg-[#2B3441] rounded-2xl shadow-2xl border border-slate-700 overflow-hidden animate-fade-in-up">
+        <div className="w-full max-w-sm mx-auto bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 overflow-hidden animate-fade-in-up">
           <div className="flex flex-col items-center pt-10 pb-6">
               <LogoPlaceholder className="h-20 w-20 mb-4 shadow-lg" />
-              <h1 className="text-2xl font-bold text-slate-100">Oficina da Arte</h1>
-              <p className="text-slate-400 text-sm mt-1">Acesse ou crie sua conta</p>
+              <h1 className="text-2xl font-bold text-gray-100">Oficina da Arte</h1>
+              <p className="text-gray-400 text-sm mt-1">Gestão de Contratos</p>
           </div>
 
-          <div className="px-6">
-              <div className="flex space-x-1">
+          <div className="px-6 pb-2">
+              <div className="flex space-x-2 p-1 bg-black/40 rounded-2xl border border-gray-800">
                   <TabButton tab="login">Entrar</TabButton>
-                  <TabButton tab="register">Criar Conta</TabButton>
+                  <TabButton tab="register">Criar</TabButton>
               </div>
           </div>
 
@@ -142,18 +144,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ supabaseClient }) => {
               {activeTab === 'login' ? (
                    <form onSubmit={handleLogin} className="space-y-5">
                       <div>
-                        <label htmlFor="email-login" className="block text-sm font-medium text-slate-300 mb-1">E-mail</label>
+                        <label htmlFor="email-login" className="block text-sm font-medium text-gray-300 mb-1">E-mail</label>
                         <input id="email-login" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input-style" />
                       </div>
 
                       <div>
                         <div className="flex justify-between items-baseline mb-1">
-                          <label htmlFor="password-login" className="block text-sm font-medium text-slate-300">Senha</label>
+                          <label htmlFor="password-login" className="block text-sm font-medium text-gray-300">Senha</label>
                           <button type="button" onClick={() => setIsResettingPassword(true)} className="text-xs text-amber-500 hover:text-amber-400 font-semibold">Esqueceu a senha?</button>
                         </div>
                         <div className="relative">
                           <input id="password-login" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} className="input-style" />
-                          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200">
+                          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-200">
                             {showPassword ? <EyeSlashIcon className="h-5 w-5"/> : <EyeIcon className="h-5 w-5"/>}
                           </button>
                         </div>
@@ -161,28 +163,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({ supabaseClient }) => {
 
                       <div className="pt-2">
                         <button type="submit" disabled={isLoading} className="button-primary">
-                            {isLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : 'Entrar'}
+                            {isLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : 'Entrar na Plataforma'}
                         </button>
                       </div>
                   </form>
               ) : (
                   <form onSubmit={handleRegister} className="space-y-4">
                       <div>
-                          <label htmlFor="register-name" className="block text-sm font-medium text-slate-300 mb-1">Nome</label>
+                          <label htmlFor="register-name" className="block text-sm font-medium text-gray-300 mb-1">Nome Completo</label>
                           <input id="register-name" name="name" type="text" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} className="input-style" />
                       </div>
                       <div>
-                          <label htmlFor="register-email" className="block text-sm font-medium text-slate-300 mb-1">E-mail</label>
+                          <label htmlFor="register-email" className="block text-sm font-medium text-gray-300 mb-1">E-mail</label>
                           <input id="register-email" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input-style" />
                       </div>
                       <div>
-                          <label htmlFor="register-password" className="block text-sm font-medium text-slate-300 mb-1">Senha</label>
+                          <label htmlFor="register-password" className="block text-sm font-medium text-gray-300 mb-1">Senha</label>
                           <input id="register-password" name="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="input-style" />
-                          <p className="text-xs text-slate-500 mt-1">Mínimo de 6 caracteres.</p>
+                          <p className="text-xs text-gray-500 mt-1">Mínimo de 6 caracteres.</p>
                       </div>
                       <div className="pt-2">
                         <button type="submit" disabled={isLoading} className="button-primary">
-                            {isLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : 'Criar Conta'}
+                            {isLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : 'Criar minha Conta'}
                         </button>
                       </div>
                   </form>
@@ -190,31 +192,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ supabaseClient }) => {
           </div>
         </div>
         <style>{`
-          .input-style { appearance: none; display: block; width: 100%; padding: 0.75rem; border: 1px solid #475569; border-radius: 0.5rem; background-color: #1E293B; color: #f8fafc; transition: border-color 0.2s; }
-          .input-style::placeholder { color: #64748b; }
-          .input-style:focus { outline: 2px solid transparent; outline-offset: 2px; border-color: #f59e0b; }
-          .button-primary { width: 100%; display: flex; justify-content: center; padding: 0.75rem 1rem; border: 1px solid transparent; border-radius: 0.5rem; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; color: #1E293B; background-color: #ca8a04; transition: background-color 0.2s; }
-          .button-primary:hover:not(:disabled) { background-color: #d97706; }
-          .button-primary:focus { outline: 2px solid transparent; outline-offset: 2px; }
-          .button-primary:disabled { background-color: #b45309; cursor: not-allowed; }
-          @keyframes fade-in-up { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+          .input-style { appearance: none; display: block; width: 100%; padding: 0.75rem; border: 1px solid #374151; border-radius: 0.75rem; background-color: #000000; color: #f9fafb; transition: all 0.2s; }
+          .input-style:focus { outline: none; border-color: #f59e0b; box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2); }
+          .button-primary { width: 100%; display: flex; justify-content: center; padding: 0.75rem 1rem; border: none; border-radius: 0.75rem; font-size: 0.875rem; line-height: 1.25rem; font-weight: 700; color: #000000; background: #eab308; box-shadow: 0 4px 12px rgba(234, 179, 8, 0.3); transition: all 0.3s; }
+          .button-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(234, 179, 8, 0.4); background: #ca8a04; }
+          .button-primary:active:not(:disabled) { transform: scale(0.98); }
+          .button-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+          @keyframes fade-in-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
           .animate-fade-in-up { animation: fade-in-up 0.4s ease-out forwards; }
         `}</style>
       </div>
-      {isResettingPassword && (
-        <ResetPasswordModal 
-            supabaseClient={supabaseClient} 
-            onClose={() => {
-                setIsResettingPassword(false);
-                setError(null);
-                setMessage(null);
-            }} 
-            onSuccess={(msg) => {
-                setIsResettingPassword(false);
-                setMessage(msg);
-            }}
-        />
-      )}
     </>
   );
 };

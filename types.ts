@@ -1,4 +1,5 @@
 
+
 export interface User {
   id: number;
   name: string;
@@ -52,6 +53,7 @@ export interface Invoice {
 export interface Contract {
   id: number;
   biddingId: string;
+  biddingType: 'pregão' | 'dispensa';
   creationDate: string; // YYYY-MM-DD
   cnpj?: string;
   uasg?: string;
@@ -111,3 +113,5 @@ export interface DashboardInvoice extends Invoice {
   clientId: number;
   contractId: number;
 }
+
+export type DashboardView = 'finance' | 'contracts' | 'commitments' | 'invoices';

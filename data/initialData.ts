@@ -1,4 +1,5 @@
 
+
 import type { Client } from '../types';
 
 export const initialClientsData: Client[] = [
@@ -12,6 +13,7 @@ export const initialClientsData: Client[] = [
       {
         id: 101,
         biddingId: '90001/2023',
+        biddingType: 'pregão',
         creationDate: '2023-11-15',
         cnpj: '00.394.429/0079-99',
         items: [
@@ -38,6 +40,7 @@ export const initialClientsData: Client[] = [
       {
         id: 201,
         biddingId: '12054/2024',
+        biddingType: 'pregão',
         creationDate: '2024-05-20',
         cnpj: '46.634.331/0001-20',
         items: [
@@ -62,6 +65,7 @@ export const initialClientsData: Client[] = [
       {
         id: 301,
         biddingId: 'TESTE-2024',
+        biddingType: 'dispensa',
         creationDate: '2024-07-01',
         cnpj: '99.999.999/0001-99',
         items: [
@@ -80,6 +84,7 @@ export const initialClientsData: Client[] = [
        {
         id: 302,
         biddingId: 'TESTE-2025',
+        biddingType: 'pregão',
         creationDate: '2025-01-10',
         cnpj: '99.999.999/0001-99',
         items: [

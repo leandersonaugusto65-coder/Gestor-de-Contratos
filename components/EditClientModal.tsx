@@ -189,7 +189,7 @@ export const EditClientModal: React.FC<EditClientModalProps> = ({ client, onClos
                         <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors">
                             Cancelar
                         </button>
-                        <button type="submit" className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-bold rounded-lg shadow-lg transition-all">
+                        <button type="submit" className="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg shadow-lg transition-all">
                             Salvar Alterações
                         </button>
                     </div>

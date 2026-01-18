@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import type { Contract, Invoice, InvoiceItem } from '../types';
 
@@ -60,6 +59,8 @@ export const AddInvoiceForm: React.FC<AddInvoiceFormProps> = ({ contract, onClos
             date,
             items: itemsToSupply
         });
+        // Fecha o modal após adicionar
+        onClose();
     };
     
     const itemsWithBalanceToSupply = contract.items.filter(item => balanceToSupply[item.id] > 0);
@@ -126,8 +127,8 @@ export const AddInvoiceForm: React.FC<AddInvoiceFormProps> = ({ contract, onClos
                 .input { display: block; width: 100%; padding: 0.5rem 0.75rem; background-color: #374151; border: 1px solid #4b5563; border-radius: 0.375rem; font-size: 0.875rem; color: white; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
                 .input:focus { outline: 2px solid transparent; outline-offset: 2px; --tw-ring-color: #ca8a04; border-color: #ca8a04; }
                 .input:disabled { background-color: #4b5563; cursor: not-allowed; }
-                .btn-primary { display: inline-flex; justify-content: center; padding: 0.5rem 1rem; border: 1px solid transparent; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); font-size: 0.875rem; font-weight: 500; border-radius: 0.375rem; color: white; background-color: #ca8a04; }
-                .btn-primary:hover { background-color: #a16207; }
+                .btn-primary { display: inline-flex; justify-content: center; padding: 0.5rem 1rem; border: 1px solid transparent; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); font-size: 0.875rem; font-weight: 500; border-radius: 0.375rem; color: black; background-color: #eab308; }
+                .btn-primary:hover { background-color: #ca8a04; }
                 .btn-primary:disabled { background-color: #4b5563; cursor: not-allowed; }
                 .btn-secondary { padding: 0.5rem 1rem; border: 1px solid #4b5563; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); font-size: 0.875rem; font-weight: 500; color: #d1d5db; background-color: #374151; }
                 .btn-secondary:hover { background-color: #4b5563; }
