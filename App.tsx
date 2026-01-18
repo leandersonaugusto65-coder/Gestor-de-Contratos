@@ -153,36 +153,36 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      // Força a saída no Supabase
       await supabase.auth.signOut();
-      
-      // LIMPEZA NUCLEAR: Limpa tudo que pode estar travando o app
       localStorage.clear();
       sessionStorage.clear();
-      
-      // Limpa estados locais
       setSession(null);
       setProfile(null);
       setClients(null);
       setSelectedClientId(null);
-
-      // Redireciona/Recarrega para garantir que o estado do SW seja resetado
       window.location.href = window.location.origin;
     } catch (e) {
       console.error("Logout error:", e);
-      // Fallback drástico se o signOut falhar
       localStorage.clear();
       window.location.reload();
     }
   };
 
-  const handleAddContract = ({ clientName, address, cep, clientId, contractData }: any) => {
+  const handleAddContract = ({ clientName, address, cep, clientId, contractData, items }: any) => {
     if (!clients) return;
+    
+    // Preparar os itens se vierem da extração
+    const finalItems: ContractItem[] = (items || []).map((item: any, index: number) => ({
+      ...item,
+      id: Date.now() + index
+    }));
+
     const newContract: Contract = {
       id: Date.now(),
       ...contractData,
-      items: [], commitments: [], invoices: [],
+      items: finalItems, commitments: [], invoices: [],
     };
+
     let newClients = [...clients];
     if (clientId) {
       newClients = newClients.map(c => {
@@ -210,7 +210,7 @@ export default function App() {
       }
     }
     setClients(newClients);
-    setNotification({ message: 'Contrato salvo!', type: 'success' });
+    setNotification({ message: 'Contrato salvo com sucesso!', type: 'success' });
     setIsAddingContract(false);
   };
 
