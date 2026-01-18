@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import type { Contract, ContractSummary, ContractItem, Commitment, Invoice } from '../types';
 import { ContractItemsTable } from './ContractItemsTable';
@@ -17,7 +18,6 @@ import { TrashIcon } from './icons/TrashIcon';
 import { ConfirmUpdateModal } from './ConfirmUpdateModal';
 import { ExportDropdown } from './ExportDropdown';
 import { DocumentArrowDownIcon } from './icons/DocumentArrowDownIcon';
-import { BookmarkSquareIcon } from './icons/BookmarkSquareIcon';
 import { formatCNPJ, stripCNPJ } from '../utils/cnpj';
 
 interface ContractCardProps {
@@ -85,32 +85,6 @@ export const ContractCard: React.FC<ContractCardProps> = (props) => {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const handleDownloadAta = () => {
-    if (!contract.biddingId) {
-      alert("O Nº da Licitação é obrigatório para buscar a ata.");
-      return;
-    }
-
-    // Para encontrar a ata específica no PNCP sem saber o número sequencial (/10, /16, etc)
-    // montamos uma URL de busca que filtra pelo CNPJ da Entidade e pelo Texto da Licitação.
-    
-    const entityCnpj = contract.cnpj || clientCnpj;
-    const biddingText = contract.biddingId;
-    
-    // Se não tiver CNPJ, tentamos buscar pela UASG + Número do Pregão para ser mais preciso
-    const searchTerm = entityCnpj 
-      ? encodeURIComponent(biddingText) 
-      : encodeURIComponent(`${contract.uasg || ''} ${biddingText}`);
-
-    let url = `https://pncp.gov.br/app/atas?pagina=1&texto=${searchTerm}`;
-    
-    if (entityCnpj) {
-      url += `&entidadeCnpj=${stripCNPJ(entityCnpj)}`;
-    }
-
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
   const { exportHeaders, exportData, exportFilename, exportPdfTitle } = useMemo(() => {
     const fn = `Contrato_${contract.biddingId.replace(/[/\\?%*:|"<>]/g, '-')}`;
     if (activeView === 'items') return {
@@ -174,7 +148,6 @@ export const ContractCard: React.FC<ContractCardProps> = (props) => {
             {!isReadOnly && (
               <div className="flex gap-2">
                 <button onClick={handleDownloadEdital} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all" title="Baixar Edital"><DocumentArrowDownIcon className="w-5 h-5"/></button>
-                <button onClick={handleDownloadAta} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all" title="Baixar Ata no PNCP"><BookmarkSquareIcon className="w-5 h-5"/></button>
                 <button onClick={() => setIsEditingContract(true)} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all"><PencilIcon className="w-5 h-5" /></button>
                 <button onClick={() => setIsDeleteConfirmOpen(true)} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-red-500 hover:border-red-600/30 transition-all"><TrashIcon className="w-5 h-5" /></button>
                 <ExportDropdown headers={exportHeaders} data={exportData} filenamePrefix={exportFilename} pdfTitle={exportPdfTitle} />
@@ -208,3 +181,14 @@ export const ContractCard: React.FC<ContractCardProps> = (props) => {
 
         <div className="p-6 bg-gray-900/60 border-t border-gray-700/50">
           <ContractSummaryView summary={summary} />
+        </div>
+
+        {isEditingContract && <EditContractModal contract={contract} onClose={() => setIsEditingContract(false)} onUpdate={(d) => { onUpdateContract(clientId, contract.id, d); setIsEditingContract(false); }} />}
+        <ConfirmUpdateModal isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)} onConfirm={() => onDeleteContract(clientId, contract.id)} title="Excluir Contrato" message="Deseja realmente excluir este contrato?" />
+        {isAddingItem && <AddItemForm onClose={() => setIsAddingItem(false)} onAddItem={(i) => onAddItem(clientId, contract.id, i)} />}
+        {isAddingCommitment && <AddCommitmentForm contract={contract} onClose={() => setIsAddingCommitment(false)} onAddCommitment={(c) => onAddCommitment(clientId, contract.id, c)} />}
+        {/* Fix typo: 'isAdding invoice' to 'isAddingInvoice' */}
+        {isAddingInvoice && <AddInvoiceForm contract={contract} onClose={() => setIsAddingInvoice(false)} onAddInvoice={(i) => onAddInvoice(clientId, contract.id, i)} />}
+    </div>
+  );
+};
