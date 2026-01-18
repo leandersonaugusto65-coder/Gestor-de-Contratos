@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import type { Client, Contract, ContractItem, Commitment, Invoice, DashboardContract, DashboardCommitment, DashboardInvoice, GlobalSummaryData, Profile } from './types';
@@ -55,12 +56,16 @@ export default function App() {
   // Session Management
   useEffect(() => {
     const fetchInitialSession = async () => {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error("Initial session error:", sessionError);
-        setAuthError("Falha ao obter sessão inicial.");
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        setSession(session);
+      } catch (e) {
+        console.error("Session error:", e);
+        setAuthError("Erro de sessão.");
+      } finally {
+        setIsAuthLoading(false);
       }
-      setSession(session);
     };
 
     fetchInitialSession();
@@ -68,6 +73,10 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
+        if (!session) {
+          setProfile(null);
+          setClients(null);
+        }
       }
     );
 
@@ -79,9 +88,6 @@ export default function App() {
     const getProfile = async () => {
       if (session) {
         setIsAuthLoading(true);
-        setAuthError(null);
-        setProfile(null);
-
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -90,13 +96,10 @@ export default function App() {
 
         if (profileError) {
           console.error("Profile fetch error:", profileError.message);
-          setAuthError("Não foi possível carregar seu perfil. Tente sair e entrar novamente.");
+          setAuthError("Erro ao carregar perfil.");
         } else {
           setProfile(profileData);
         }
-        setIsAuthLoading(false);
-      } else {
-        setProfile(null);
         setIsAuthLoading(false);
       }
     };
@@ -118,18 +121,11 @@ export default function App() {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching data from Supabase:', error.message);
         setErrorLoading(error.message);
       } else if (data && data.data) {
         setClients(data.data);
       } else {
         setClients(initialClientsData);
-        const { error: insertError } = await supabase
-          .from('app_data')
-          .insert({ id: 1, data: initialClientsData });
-        if (insertError) {
-          setErrorLoading(insertError.message);
-        }
       }
       setIsLoadingData(false);
     };
@@ -148,13 +144,7 @@ export default function App() {
 
     const saveData = async () => {
       setIsSavingData(true);
-      const { error } = await supabase
-        .from('app_data')
-        .upsert({ id: 1, data: debouncedClients });
-
-      if (error) {
-        setNotification({ message: 'Erro ao salvar dados!', type: 'error' });
-      }
+      await supabase.from('app_data').upsert({ id: 1, data: debouncedClients });
       setIsSavingData(false);
     };
 
@@ -162,11 +152,28 @@ export default function App() {
   }, [debouncedClients, isLoadingData, session, profile, isReadOnly]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-    setProfile(null);
-    setClients(null);
-    setSelectedClientId(null);
+    try {
+      // Força a saída no Supabase
+      await supabase.auth.signOut();
+      
+      // LIMPEZA NUCLEAR: Limpa tudo que pode estar travando o app
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Limpa estados locais
+      setSession(null);
+      setProfile(null);
+      setClients(null);
+      setSelectedClientId(null);
+
+      // Redireciona/Recarrega para garantir que o estado do SW seja resetado
+      window.location.href = window.location.origin;
+    } catch (e) {
+      console.error("Logout error:", e);
+      // Fallback drástico se o signOut falhar
+      localStorage.clear();
+      window.location.reload();
+    }
   };
 
   const handleAddContract = ({ clientName, address, cep, clientId, contractData }: any) => {
@@ -454,8 +461,8 @@ export default function App() {
   if (!profile) return (
     <div className="min-h-screen flex flex-col justify-center items-center bg-gray-900 text-white p-4 text-center">
         <HourglassIcon className="w-12 h-12 text-yellow-500 mb-4" />
-        <h1 className="text-xl font-bold mb-2">Carregando perfil...</h1>
-        <button onClick={handleLogout} className="mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Sair e Tentar Novamente</button>
+        <h1 className="text-xl font-bold mb-2">Sessão expirada ou erro de perfil</h1>
+        <button onClick={handleLogout} className="mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Sair e Resetar App</button>
     </div>
   );
 

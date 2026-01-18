@@ -20,13 +20,24 @@ import { ExportDropdown } from './ExportDropdown';
 import { DocumentArrowDownIcon } from './icons/DocumentArrowDownIcon';
 import { formatCNPJ, stripCNPJ } from '../utils/cnpj';
 
+// Prop definitions for ContractCard component
 interface ContractCardProps {
-  clientId: number; clientName: string; clientUasg: string; clientCnpj?: string; contract: Contract; isReadOnly: boolean;
-  onDeleteItem: (cId: number, ctId: number, iId: number) => void; onDeleteContract: (cId: number, ctId: number) => void;
-  onDeleteCommitment: (cId: number, ctId: number, comId: number) => void; onDeleteInvoice: (cId: number, ctId: number, invId: number) => void;
-  onAddItem: (cId: number, ctId: number, newItem: any) => void; onUpdateContract: (cId: number, ctId: number, data: any) => void;
-  onAddCommitment: (cId: number, ctId: number, data: any) => void; onAddInvoice: (cId: number, ctId: number, data: any) => void;
-  onMarkInvoiceAsPaid: (cId: number, ctId: number, invId: number) => void; onMarkInvoiceAsUnpaid: (cId: number, ctId: number, invId: number) => void;
+  clientId: number;
+  clientName: string;
+  clientUasg: string;
+  clientCnpj?: string;
+  contract: Contract;
+  isReadOnly: boolean;
+  onDeleteItem: (cId: number, ctId: number, iId: number) => void;
+  onDeleteContract: (cId: number, ctId: number) => void;
+  onDeleteCommitment: (cId: number, ctId: number, comId: number) => void;
+  onDeleteInvoice: (cId: number, ctId: number, invId: number) => void;
+  onAddItem: (cId: number, ctId: number, newItem: any) => void;
+  onUpdateContract: (cId: number, ctId: number, data: any) => void;
+  onAddCommitment: (cId: number, ctId: number, data: any) => void;
+  onAddInvoice: (cId: number, ctId: number, data: any) => void;
+  onMarkInvoiceAsPaid: (cId: number, ctId: number, invId: number) => void;
+  onMarkInvoiceAsUnpaid: (cId: number, ctId: number, invId: number) => void;
 }
 
 const formatCurrency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -54,35 +65,38 @@ export const ContractCard: React.FC<ContractCardProps> = (props) => {
   }, [contract]);
   
   const handleDownloadEdital = () => {
-    if (!contract.biddingType || !contract.uasg || !contract.biddingId) {
-      alert("Informações incompletas para gerar o link do edital (UASG, Nº da Licitação e Tipo são obrigatórios).");
+    const rawUasg = contract.uasg || clientUasg;
+    
+    if (!rawUasg || !contract.biddingId) {
+      alert("UASG e Nº da Licitação são obrigatórios.");
       return;
     }
     
     if (!contract.biddingId.includes('/')) {
-        alert("O formato do Nº da Licitação está inválido. Use o formato NÚMERO/ANO, por exemplo: 90001/2024.");
+        alert("Formato esperado: NÚMERO/ANO (ex: 90033/2025)");
         return;
     }
 
-    const coduasg = contract.uasg.replace(/\D/g, '');
-    const [biddingNumber, biddingYear] = contract.biddingId.split('/');
+    // 1. Unidade Compradora (UASG - 6 dígitos)
+    const uasg = rawUasg.replace(/\D/g, '').padStart(6, '0').slice(-6);
     
-    const cleanBiddingNumber = biddingNumber.replace(/\D/g, '');
-    const cleanBiddingYear = biddingYear.replace(/\D/g, '');
+    // 2. Número da Compra (Número - 5 dígitos + Ano - 4 dígitos)
+    const [numPart, yearPart] = contract.biddingId.split('/');
+    const num = numPart.replace(/\D/g, '').padStart(5, '0').slice(-5);
+    const year = yearPart.replace(/\D/g, '').padStart(4, '0').slice(-4);
+    const numeroCompraFull = `${num}${year}`; 
 
-    if (!cleanBiddingNumber || !cleanBiddingYear) {
-         alert("O formato do Nº da Licitação está inválido.");
-        return;
-    }
+    // 3. Modalidade (Pregão = 05, Dispensa = 06 no ID composto para o Portal)
+    const modalidadeId = contract.biddingType === 'pregão' ? '05' : '06';
 
-    const paddedNumber = cleanBiddingNumber.padStart(5, '0');
-    const numprp = `${paddedNumber}${cleanBiddingYear}`;
+    /**
+     * URL de Acompanhamento Direto (Conforme a sua imagem)
+     * O ID da compra é formado por: UASG (6) + MODALIDADE (2) + NÚMERO (5) + ANO (4)
+     */
+    const compositeId = `${uasg}${modalidadeId}${numeroCompraFull}`;
+    const directUrl = `https://cnetmobile.estaleiro.serpro.gov.br/comprasnet-web/public/compras/acompanhamento-compra?compra=${compositeId}`;
     
-    let modprp = contract.biddingType === 'pregão' ? '5' : '4';
-
-    const url = `http://comprasnet.gov.br/ConsultaLicitacoes/download/download_editais_detalhe.asp?coduasg=${coduasg}&modprp=${modprp}&numprp=${numprp}`;
-    
-    window.open(url, '_blank', 'noopener,noreferrer');
+    window.open(directUrl, '_blank', 'noopener,noreferrer');
   };
 
   const { exportHeaders, exportData, exportFilename, exportPdfTitle } = useMemo(() => {
@@ -141,13 +155,19 @@ export const ContractCard: React.FC<ContractCardProps> = (props) => {
                   <div className='text-sm text-gray-400 mt-1 flex flex-wrap gap-x-4 gap-y-1 items-center'>
                     <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-yellow-600" /> Criado em: {formatDate(contract.creationDate)}</span>
                     {validityDate && <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-green-500" /> Vigência até: {validityDate}</span>}
-                    <span className="opacity-60">UASG: {contract.uasg} | CNPJ: {contract.cnpj}</span>
+                    <span className="opacity-60">UASG: {contract.uasg || clientUasg} | CNPJ: {contract.cnpj || clientCnpj}</span>
                   </div>
               </div>
             </div>
             {!isReadOnly && (
               <div className="flex gap-2">
-                <button onClick={handleDownloadEdital} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all" title="Baixar Edital"><DocumentArrowDownIcon className="w-5 h-5"/></button>
+                <button 
+                  onClick={handleDownloadEdital} 
+                  className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all" 
+                  title="Abrir Licitação (Clique no ícone de Nuvem na página que abrir para baixar o edital)"
+                >
+                  <DocumentArrowDownIcon className="w-5 h-5"/>
+                </button>
                 <button onClick={() => setIsEditingContract(true)} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all"><PencilIcon className="w-5 h-5" /></button>
                 <button onClick={() => setIsDeleteConfirmOpen(true)} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-red-500 hover:border-red-600/30 transition-all"><TrashIcon className="w-5 h-5" /></button>
                 <ExportDropdown headers={exportHeaders} data={exportData} filenamePrefix={exportFilename} pdfTitle={exportPdfTitle} />
@@ -187,7 +207,6 @@ export const ContractCard: React.FC<ContractCardProps> = (props) => {
         <ConfirmUpdateModal isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)} onConfirm={() => onDeleteContract(clientId, contract.id)} title="Excluir Contrato" message="Deseja realmente excluir este contrato?" />
         {isAddingItem && <AddItemForm onClose={() => setIsAddingItem(false)} onAddItem={(i) => onAddItem(clientId, contract.id, i)} />}
         {isAddingCommitment && <AddCommitmentForm contract={contract} onClose={() => setIsAddingCommitment(false)} onAddCommitment={(c) => onAddCommitment(clientId, contract.id, c)} />}
-        {/* Fix typo: 'isAdding invoice' to 'isAddingInvoice' */}
         {isAddingInvoice && <AddInvoiceForm contract={contract} onClose={() => setIsAddingInvoice(false)} onAddInvoice={(i) => onAddInvoice(clientId, contract.id, i)} />}
     </div>
   );
