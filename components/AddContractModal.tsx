@@ -11,30 +11,6 @@ interface AddContractModalProps {
   onAddContract: (args: { clientName: string; address: string; cep: string; contractData: Omit<Contract, 'id' | 'items' | 'commitments' | 'invoices'> }) => void;
 }
 
-const performGoogleSearchForCnpj = async (cnpj: string): Promise<{ summary?: string; sources: any[] }> => {
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const prompt = `Faça uma busca no Google por informações públicas sobre o CNPJ: ${cnpj}. Resuma os principais dados encontrados, como nome da empresa/órgão e endereço, se disponíveis.`;
-    
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: prompt,
-      tools: [{googleSearch: {}}],
-    });
-    
-    const summary = response.text?.trim();
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-    const sources = (groundingChunks && Array.isArray(groundingChunks)) ? groundingChunks.filter(c => c.web) : [];
-    
-    return { summary, sources };
-
-  } catch (error) {
-    console.error("Gemini CNPJ search failed:", error);
-    return { summary: "Ocorreu um erro ao realizar a busca pelo CNPJ.", sources: [] };
-  }
-};
-
-
 export const AddContractModal: React.FC<AddContractModalProps> = ({ clients, onClose, onAddContract }) => {
     const [clientName, setClientName] = useState('');
     const [biddingId, setBiddingId] = useState('');
@@ -48,16 +24,13 @@ export const AddContractModal: React.FC<AddContractModalProps> = ({ clients, onC
     const [cnpjError, setCnpjError] = useState<string | null>(null);
 
     const [isFetchingCnpj, setIsFetchingCnpj] = useState(false);
-    const [isFetchingUasg, setIsFetchingUasg] = useState(false);
     const [apiError, setApiError] = useState<string | null>(null);
-    const [cnpjSearchSummary, setCnpjSearchSummary] = useState('');
-    const [cnpjSearchResults, setCnpjSearchResults] = useState<any[]>([]);
     
-    const debouncedCnpj = useDebounce(cnpj, 1200);
+    const debouncedCnpj = useDebounce(cnpj, 800);
 
-    // Effect for CNPJ -> Fetch Details with AI
+    // Effect for CNPJ -> Fetch Details
     useEffect(() => {
-        const fetchDataForCnpj = async (cnpjToFetch: string) => {
+        const fetchCnpjData = async (cnpjToFetch: string) => {
             const onlyNumbersCnpj = stripCNPJ(cnpjToFetch);
             if (onlyNumbersCnpj.length !== 14) {
                  if (onlyNumbersCnpj.length > 0 && onlyNumbersCnpj.length < 14) setCnpjError(null);
@@ -71,43 +44,26 @@ export const AddContractModal: React.FC<AddContractModalProps> = ({ clients, onC
             setCnpjError(null);
             setIsFetchingCnpj(true);
             setApiError(null);
-            setClientName('');
-            setAddress('');
-            setCep('');
-            setCnpjSearchSummary('');
-            setCnpjSearchResults([]);
 
             try {
-                // Perform Google Search
-                const searchResult = await performGoogleSearchForCnpj(onlyNumbersCnpj);
-                setCnpjSearchSummary(searchResult.summary || '');
-                setCnpjSearchResults(searchResult.sources || []);
-
-                // Still fetch UASG from the specific government API
-                setIsFetchingUasg(true);
-                try {
-                    const govApiUrl = `https://compras.dados.gov.br/orgaos/v1/orgaos.json?cnpj=${onlyNumbersCnpj}`;
-                    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(govApiUrl)}`;
-                    const govApiResponse = await fetch(proxyUrl);
-                    if (govApiResponse.ok) {
-                        const govApiData = await govApiResponse.json();
-                        if (govApiData?._embedded?.orgaos?.[0]?.codigoUasg) {
-                            setUasg(govApiData._embedded.orgaos[0].codigoUasg);
-                        }
-                    }
-                } catch (govError) { 
-                    console.error("UASG lookup by CNPJ failed:", govError);
-                } finally { 
-                    setIsFetchingUasg(false); 
+                const brasilApiResponse = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${onlyNumbersCnpj}`);
+                if (!brasilApiResponse.ok) throw new Error('CNPJ não encontrado na Receita Federal.');
+                
+                const data = await brasilApiResponse.json();
+                if (data) {
+                    setClientName(data.nome_fantasia || data.razao_social);
+                    const formattedAddress = [data.logradouro, data.numero, data.complemento, data.bairro, data.municipio, data.uf].filter(Boolean).join(', ').replace(' ,', ',');
+                    setAddress(formattedAddress);
+                    if (data.cep) setCep(data.cep.replace(/\D/g, ''));
                 }
             } catch (err) {
-                setApiError(err instanceof Error ? err.message : 'Erro ao buscar dados do CNPJ.');
+                setApiError(err instanceof Error ? err.message : 'Erro ao buscar CNPJ.');
             } finally {
                 setIsFetchingCnpj(false);
             }
         };
 
-        if (debouncedCnpj) fetchDataForCnpj(debouncedCnpj);
+        if (debouncedCnpj) fetchCnpjData(debouncedCnpj);
     }, [debouncedCnpj]);
     
     const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,8 +76,6 @@ export const AddContractModal: React.FC<AddContractModalProps> = ({ clients, onC
              setAddress('');
              setCep('');
              setUasg('');
-             setCnpjSearchSummary('');
-             setCnpjSearchResults([]);
         }
     };
     
@@ -159,66 +113,29 @@ export const AddContractModal: React.FC<AddContractModalProps> = ({ clients, onC
                         <header className="flex items-center justify-between mb-2">
                             <h2 className="text-xl font-bold text-white">Novo Cliente / Contrato</h2>
                              <div className="flex gap-2">
-                                {isFetchingCnpj && <span className="text-[10px] text-cyan-400 animate-pulse">Pesquisando...</span>}
-                                {isFetchingUasg && <span className="text-[10px] text-green-400 animate-pulse">Buscando UASG...</span>}
+                                {isFetchingCnpj && <span className="text-[10px] text-blue-400 animate-pulse">Buscando Dados...</span>}
                             </div>
                         </header>
 
-                         <div>
-                            <label htmlFor="cnpj" className="block text-sm font-medium text-gray-400 mb-1">CNPJ</label>
+                        <div className="relative">
+                             <label htmlFor="cnpj" className="block text-sm font-medium text-gray-400 mb-1">CNPJ</label>
                              <div className="relative">
-                                <input type="text" id="cnpj" value={cnpj} onChange={handleCnpjChange} className={`block w-full px-3 py-2 bg-gray-700 border ${cnpjError ? 'border-red-500' : 'border-gray-600'} rounded-md text-sm text-white focus:outline-none focus:border-yellow-600`} maxLength={18} placeholder="Digite para pesquisar no Google"/>
+                                <input type="text" id="cnpj" value={cnpj} onChange={handleCnpjChange} className={`block w-full px-3 py-2 bg-gray-700 border ${cnpjError ? 'border-red-500' : 'border-gray-600'} rounded-md text-sm text-white focus:outline-none focus:border-yellow-600`} maxLength={18} placeholder="Digite para buscar dados"/>
+                                {isFetchingCnpj && <SpinnerIcon className="w-4 h-4 text-blue-400 absolute right-3 top-1/2 -translate-y-1/2 animate-spin" />}
                             </div>
                             {cnpjError && <p className="text-red-500 text-[10px] mt-1">{cnpjError}</p>}
                         </div>
 
-                        <div className="mt-2 space-y-3">
-                            {isFetchingCnpj ? (
-                                <div className="flex justify-center items-center gap-2 text-sm text-gray-400 py-4"><SpinnerIcon className="w-4 h-4 animate-spin"/> Pesquisando...</div>
-                            ) : (
-                                (cnpjSearchSummary || cnpjSearchResults.length > 0) && (
-                                    <div className="p-3 bg-black/30 rounded-md border border-gray-600 animate-fade-in">
-                                        {cnpjSearchSummary && (
-                                            <p className="text-sm text-gray-300 whitespace-pre-wrap mb-3">{cnpjSearchSummary}</p>
-                                        )}
-                                        {cnpjSearchResults.length > 0 && (
-                                            <ul className="space-y-2 border-t border-gray-700 pt-3">
-                                                {cnpjSearchResults.map((source, index) => source.web && (
-                                                    <li key={index}>
-                                                        <a 
-                                                            href={source.web.uri} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer" 
-                                                            className="block p-2 rounded-md hover:bg-gray-800 transition-colors"
-                                                        >
-                                                            <p className="text-blue-400 hover:underline text-sm font-semibold truncate" title={source.web.title}>
-                                                                {source.web.title}
-                                                            </p>
-                                                            <p className="text-green-500 text-xs truncate" title={source.web.uri}>
-                                                                {source.web.uri}
-                                                            </p>
-                                                        </a>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        )}
-                                    </div>
-                                )
-                            )}
-                        </div>
-
-                        <div className="relative">
+                        <div>
                             <label htmlFor="clientName" className="block text-sm font-medium text-gray-400 mb-1">Órgão / Cliente</label>
                             <input type="text" id="clientName" value={clientName} onChange={(e) => { setClientName(e.target.value); setError(null); }} className={`block w-full px-3 py-2 bg-gray-700 border ${error ? 'border-red-500' : 'border-gray-600'} rounded-md text-sm text-white focus:outline-none focus:border-yellow-600`} required autoFocus />
                             {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
                         </div>
 
-
                         <div>
                             <label htmlFor="uasg" className="block text-sm font-medium text-gray-400 mb-1">Nº da UASG</label>
                             <div className="relative">
                                 <input type="text" id="uasg" value={uasg} onChange={(e) => setUasg(e.target.value)} className="block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-white focus:outline-none focus:border-yellow-600" />
-                                {isFetchingUasg && <SpinnerIcon className="w-4 h-4 text-yellow-500 absolute right-3 top-1/2 -translate-y-1/2 animate-spin" />}
                             </div>
                         </div>
                         
