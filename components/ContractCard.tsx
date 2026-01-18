@@ -54,22 +54,41 @@ export const ContractCard: React.FC<ContractCardProps> = (props) => {
   
   const handleDownloadEdital = () => {
     if (!contract.biddingType || !contract.uasg || !contract.biddingId) {
-      alert("Informações incompletas para gerar o link do edital.");
+      alert("Informações incompletas para gerar o link do edital (UASG, Nº da Licitação e Tipo são obrigatórios).");
       return;
     }
+    
+    if (!contract.biddingId.includes('/')) {
+        alert("O formato do Nº da Licitação está inválido. Use o formato NÚMERO/ANO, por exemplo: 90001/2024.");
+        return;
+    }
 
-    let url = '';
+    const coduasg = contract.uasg.replace(/\D/g, '');
+    const [biddingNumber, biddingYear] = contract.biddingId.split('/');
+    
+    const cleanBiddingNumber = biddingNumber.replace(/\D/g, '');
+    const cleanBiddingYear = biddingYear.replace(/\D/g, '');
+
+    if (!cleanBiddingNumber || !cleanBiddingYear) {
+         alert("O formato do Nº da Licitação está inválido. Use o formato NÚMERO/ANO, por exemplo: 90001/2024.");
+        return;
+    }
+
+    const numprp = `${cleanBiddingNumber}${cleanBiddingYear}`;
+    
+    let modprp = '';
     if (contract.biddingType === 'pregão') {
-      const uasg = contract.uasg.replace(/\D/g, '');
-      const biddingNumber = contract.biddingId.replace(/\D/g, '');
-      url = `http://comprasnet.gov.br/livre/pregao/ata0.asp?co_no_uasg=${uasg}&numprp=${biddingNumber}`;
+        modprp = '5';
     } else if (contract.biddingType === 'dispensa') {
-      url = `https://www.gov.br/compras/pt-br/acesso-a-sistemas/compras-governamentais/consultas/consulta-de-dispensa-eletronica`;
+        modprp = '4';
+    } else {
+        alert("Tipo de licitação não suportado para busca automática do edital.");
+        return;
     }
 
-    if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
+    const url = `http://comprasnet.gov.br/ConsultaLicitacoes/download/download_editais_detalhe.asp?coduasg=${coduasg}&modprp=${modprp}&numprp=${numprp}`;
+    
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const { exportHeaders, exportData, exportFilename, exportPdfTitle } = useMemo(() => {
