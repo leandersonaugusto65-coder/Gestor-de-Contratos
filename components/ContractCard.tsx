@@ -17,6 +17,7 @@ import { TrashIcon } from './icons/TrashIcon';
 import { ConfirmUpdateModal } from './ConfirmUpdateModal';
 import { ExportDropdown } from './ExportDropdown';
 import { DocumentArrowDownIcon } from './icons/DocumentArrowDownIcon';
+import { BookmarkSquareIcon } from './icons/BookmarkSquareIcon';
 import { formatCNPJ } from '../utils/cnpj';
 
 interface ContractCardProps {
@@ -91,6 +92,57 @@ export const ContractCard: React.FC<ContractCardProps> = (props) => {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
+  const handleDownloadAta = () => {
+    if (!contract.uasg || !contract.biddingId || !contract.biddingType) {
+      alert("Informações incompletas para gerar o link da ata (UASG, Nº da Licitação e Tipo são obrigatórios).");
+      return;
+    }
+    
+    if (!contract.biddingId.includes('/')) {
+        alert("O formato do Nº da Licitação está inválido. Use o formato NÚMERO/ANO, por exemplo: 90001/2024.");
+        return;
+    }
+
+    const uasg = contract.uasg.replace(/\D/g, '');
+    const [biddingNumber, biddingYear] = contract.biddingId.split('/');
+    
+    const cleanBiddingNumber = biddingNumber.replace(/\D/g, '');
+    const cleanBiddingYear = biddingYear.replace(/\D/g, '');
+
+    if (!cleanBiddingNumber || !cleanBiddingYear) {
+         alert("O formato do Nº da Licitação está inválido. Use o formato NÚMERO/ANO, por exemplo: 90001/2024.");
+        return;
+    }
+
+    const numprp = `${cleanBiddingNumber}${cleanBiddingYear}`;
+
+    const actionUrl = contract.biddingType === 'pregão'
+        ? 'https://www.comprasnet.gov.br/livre/pregao/AtaEletronico.asp'
+        : 'https://www.comprasnet.gov.br/seguro/dispensa/ata/AtaEletronico.asp';
+    
+    const form = document.createElement('form');
+    form.method = 'post';
+    form.action = actionUrl;
+    form.target = '_blank';
+
+    const params: { [key: string]: string } = {
+        codUASG: uasg,
+        numprp: numprp,
+    };
+
+    for (const key in params) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = params[key];
+        form.appendChild(input);
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+  };
+
   const { exportHeaders, exportData, exportFilename, exportPdfTitle } = useMemo(() => {
     const fn = `Contrato_${contract.biddingId.replace(/[/\\?%*:|"<>]/g, '-')}`;
     if (activeView === 'items') return {
@@ -154,6 +206,7 @@ export const ContractCard: React.FC<ContractCardProps> = (props) => {
             {!isReadOnly && (
               <div className="flex gap-2">
                 <button onClick={handleDownloadEdital} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all" title="Baixar Edital"><DocumentArrowDownIcon className="w-5 h-5"/></button>
+                <button onClick={handleDownloadAta} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all" title="Baixar Ata"><BookmarkSquareIcon className="w-5 h-5"/></button>
                 <button onClick={() => setIsEditingContract(true)} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all"><PencilIcon className="w-5 h-5" /></button>
                 <button onClick={() => setIsDeleteConfirmOpen(true)} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-red-500 hover:border-red-600/30 transition-all"><TrashIcon className="w-5 h-5" /></button>
                 <ExportDropdown headers={exportHeaders} data={exportData} filenamePrefix={exportFilename} pdfTitle={exportPdfTitle} />
