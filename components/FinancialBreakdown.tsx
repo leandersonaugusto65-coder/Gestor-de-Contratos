@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import type { Client } from '../types';
 import { XMarkIcon } from './icons/XMarkIcon';
@@ -43,6 +44,10 @@ const breakdownConfig = {
 export const FinancialBreakdown: React.FC<FinancialBreakdownProps> = ({ clients, activeBreakdown, onClose }) => {
   
   const stats = useMemo((): ClientStats[] => {
+    if (!activeBreakdown) return [];
+    
+    const dataKey = breakdownConfig[activeBreakdown].dataKey as keyof ClientStats;
+
     const clientStats = clients.map(client => {
       let totalBid = 0;
       let totalCommitted = 0;
@@ -67,11 +72,10 @@ export const FinancialBreakdown: React.FC<FinancialBreakdownProps> = ({ clients,
       return { id: client.id, name: client.name, totalBid, totalCommitted, totalSupplied, balanceToSupply };
     });
 
-    if (activeBreakdown) {
-      const dataKey = breakdownConfig[activeBreakdown].dataKey as keyof ClientStats;
-      return clientStats.sort((a, b) => (b[dataKey] as number) - (a[dataKey] as number));
-    }
-    return [];
+    // FILTRO: Remove da lista órgãos que não possuem valor (zerados) para o critério selecionado
+    return clientStats
+      .filter(stat => (stat[dataKey] as number) > 0)
+      .sort((a, b) => (b[dataKey] as number) - (a[dataKey] as number));
 
   }, [clients, activeBreakdown]);
 
@@ -118,7 +122,7 @@ export const FinancialBreakdown: React.FC<FinancialBreakdownProps> = ({ clients,
               {stats.length === 0 && (
                 <tr>
                   <td colSpan={2} className="px-6 py-10 text-center text-gray-500 italic">
-                    Nenhum dado financeiro disponível para exibição.
+                    Nenhum lançamento com valor maior que zero nesta categoria.
                   </td>
                 </tr>
               )}
