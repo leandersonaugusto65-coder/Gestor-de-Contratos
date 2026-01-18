@@ -18,7 +18,7 @@ import { ConfirmUpdateModal } from './ConfirmUpdateModal';
 import { ExportDropdown } from './ExportDropdown';
 import { DocumentArrowDownIcon } from './icons/DocumentArrowDownIcon';
 import { BookmarkSquareIcon } from './icons/BookmarkSquareIcon';
-import { formatCNPJ } from '../utils/cnpj';
+import { formatCNPJ, stripCNPJ } from '../utils/cnpj';
 
 interface ContractCardProps {
   clientId: number; clientName: string; clientUasg: string; clientCnpj?: string; contract: Contract; isReadOnly: boolean;
@@ -71,21 +71,14 @@ export const ContractCard: React.FC<ContractCardProps> = (props) => {
     const cleanBiddingYear = biddingYear.replace(/\D/g, '');
 
     if (!cleanBiddingNumber || !cleanBiddingYear) {
-         alert("O formato do Nº da Licitação está inválido. Use o formato NÚMERO/ANO, por exemplo: 90001/2024.");
+         alert("O formato do Nº da Licitação está inválido.");
         return;
     }
 
-    const numprp = `${cleanBiddingNumber}${cleanBiddingYear}`;
+    const paddedNumber = cleanBiddingNumber.padStart(5, '0');
+    const numprp = `${paddedNumber}${cleanBiddingYear}`;
     
-    let modprp = '';
-    if (contract.biddingType === 'pregão') {
-        modprp = '5';
-    } else if (contract.biddingType === 'dispensa') {
-        modprp = '4';
-    } else {
-        alert("Tipo de licitação não suportado para busca automática do edital.");
-        return;
-    }
+    let modprp = contract.biddingType === 'pregão' ? '5' : '4';
 
     const url = `http://comprasnet.gov.br/ConsultaLicitacoes/download/download_editais_detalhe.asp?coduasg=${coduasg}&modprp=${modprp}&numprp=${numprp}`;
     
@@ -93,54 +86,29 @@ export const ContractCard: React.FC<ContractCardProps> = (props) => {
   };
 
   const handleDownloadAta = () => {
-    if (!contract.uasg || !contract.biddingId || !contract.biddingType) {
-      alert("Informações incompletas para gerar o link da ata (UASG, Nº da Licitação e Tipo são obrigatórios).");
+    if (!contract.biddingId) {
+      alert("O Nº da Licitação é obrigatório para buscar a ata.");
       return;
     }
+
+    // Para encontrar a ata específica no PNCP sem saber o número sequencial (/10, /16, etc)
+    // montamos uma URL de busca que filtra pelo CNPJ da Entidade e pelo Texto da Licitação.
     
-    if (!contract.biddingId.includes('/')) {
-        alert("O formato do Nº da Licitação está inválido. Use o formato NÚMERO/ANO, por exemplo: 90001/2024.");
-        return;
+    const entityCnpj = contract.cnpj || clientCnpj;
+    const biddingText = contract.biddingId;
+    
+    // Se não tiver CNPJ, tentamos buscar pela UASG + Número do Pregão para ser mais preciso
+    const searchTerm = entityCnpj 
+      ? encodeURIComponent(biddingText) 
+      : encodeURIComponent(`${contract.uasg || ''} ${biddingText}`);
+
+    let url = `https://pncp.gov.br/app/atas?pagina=1&texto=${searchTerm}`;
+    
+    if (entityCnpj) {
+      url += `&entidadeCnpj=${stripCNPJ(entityCnpj)}`;
     }
 
-    const uasg = contract.uasg.replace(/\D/g, '');
-    const [biddingNumber, biddingYear] = contract.biddingId.split('/');
-    
-    const cleanBiddingNumber = biddingNumber.replace(/\D/g, '');
-    const cleanBiddingYear = biddingYear.replace(/\D/g, '');
-
-    if (!cleanBiddingNumber || !cleanBiddingYear) {
-         alert("O formato do Nº da Licitação está inválido. Use o formato NÚMERO/ANO, por exemplo: 90001/2024.");
-        return;
-    }
-
-    const numprp = `${cleanBiddingNumber}${cleanBiddingYear}`;
-
-    const actionUrl = contract.biddingType === 'pregão'
-        ? 'https://www.comprasnet.gov.br/livre/pregao/AtaEletronico.asp'
-        : 'https://www.comprasnet.gov.br/seguro/dispensa/ata/AtaEletronico.asp';
-    
-    const form = document.createElement('form');
-    form.method = 'post';
-    form.action = actionUrl;
-    form.target = '_blank';
-
-    const params: { [key: string]: string } = {
-        codUASG: uasg,
-        numprp: numprp,
-    };
-
-    for (const key in params) {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = key;
-        input.value = params[key];
-        form.appendChild(input);
-    }
-    
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const { exportHeaders, exportData, exportFilename, exportPdfTitle } = useMemo(() => {
@@ -206,7 +174,7 @@ export const ContractCard: React.FC<ContractCardProps> = (props) => {
             {!isReadOnly && (
               <div className="flex gap-2">
                 <button onClick={handleDownloadEdital} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all" title="Baixar Edital"><DocumentArrowDownIcon className="w-5 h-5"/></button>
-                <button onClick={handleDownloadAta} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all" title="Baixar Ata"><BookmarkSquareIcon className="w-5 h-5"/></button>
+                <button onClick={handleDownloadAta} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all" title="Baixar Ata no PNCP"><BookmarkSquareIcon className="w-5 h-5"/></button>
                 <button onClick={() => setIsEditingContract(true)} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-yellow-500 hover:border-yellow-600/30 transition-all"><PencilIcon className="w-5 h-5" /></button>
                 <button onClick={() => setIsDeleteConfirmOpen(true)} className="p-2.5 bg-gray-800 border border-gray-700 rounded-xl hover:text-red-500 hover:border-red-600/30 transition-all"><TrashIcon className="w-5 h-5" /></button>
                 <ExportDropdown headers={exportHeaders} data={exportData} filenamePrefix={exportFilename} pdfTitle={exportPdfTitle} />
@@ -240,13 +208,3 @@ export const ContractCard: React.FC<ContractCardProps> = (props) => {
 
         <div className="p-6 bg-gray-900/60 border-t border-gray-700/50">
           <ContractSummaryView summary={summary} />
-        </div>
-
-        {isEditingContract && <EditContractModal contract={contract} onClose={() => setIsEditingContract(false)} onUpdate={(d) => { onUpdateContract(clientId, contract.id, d); setIsEditingContract(false); }} />}
-        <ConfirmUpdateModal isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)} onConfirm={() => onDeleteContract(clientId, contract.id)} title="Excluir Contrato" message="Deseja realmente excluir este contrato?" />
-        {isAddingItem && <AddItemForm onClose={() => setIsAddingItem(false)} onAddItem={(i) => onAddItem(clientId, contract.id, i)} />}
-        {isAddingCommitment && <AddCommitmentForm contract={contract} onClose={() => setIsAddingCommitment(false)} onAddCommitment={(c) => onAddCommitment(clientId, contract.id, c)} />}
-        {isAddingInvoice && <AddInvoiceForm contract={contract} onClose={() => setIsAddingInvoice(false)} onAddInvoice={(i) => onAddInvoice(clientId, contract.id, i)} />}
-    </div>
-  );
-};
