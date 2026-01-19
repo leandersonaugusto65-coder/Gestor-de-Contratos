@@ -57,9 +57,9 @@ export default function App() {
   useEffect(() => {
     const fetchInitialSession = async () => {
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) throw sessionError;
-        setSession(session);
+        setSession(initialSession);
       } catch (e) {
         console.error("Session error:", e);
         setAuthError("Erro de sessão.");
@@ -71,9 +71,10 @@ export default function App() {
     fetchInitialSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        if (!session) {
+      (_event, currentSession) => {
+        // Só atualiza o estado se o ID do usuário mudar, prevenindo refreshes de token de resetarem a UI
+        setSession(prev => (prev?.user.id === currentSession?.user.id ? prev : currentSession));
+        if (!currentSession) {
           setProfile(null);
           setClients(null);
         }
@@ -86,7 +87,7 @@ export default function App() {
   // Fetch Profile
   useEffect(() => {
     const getProfile = async () => {
-      if (session) {
+      if (session?.user.id) {
         setIsAuthLoading(true);
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
@@ -105,14 +106,16 @@ export default function App() {
     };
 
     getProfile();
-  }, [session]);
+  }, [session?.user.id]);
 
   // Fetch initial data
   useEffect(() => {
-    if (!session || !profile?.is_approved) return;
+    if (!session?.user.id || !profile?.is_approved) return;
 
     const fetchData = async () => {
-      setIsLoadingData(true);
+      // Se já temos dados, não mostramos o spinner global para não resetar a UI aberta
+      if (!clients) setIsLoadingData(true);
+      
       setErrorLoading(null);
       const { data, error } = await supabase
         .from('app_data')
@@ -131,7 +134,7 @@ export default function App() {
     };
 
     fetchData();
-  }, [session, profile]);
+  }, [session?.user.id, profile?.is_approved]);
 
   const debouncedClients = useDebounce(clients, 1500);
   const isReadOnly = profile?.role === 'user';
@@ -474,7 +477,8 @@ export default function App() {
     </div>
   );
 
-  if (isLoadingData || clients === null) return <div className="min-h-screen flex justify-center items-center bg-gray-900"><SpinnerIcon className="w-10 h-10 text-yellow-500 animate-spin" /></div>;
+  // Só mostra o Spinner se os clientes ainda forem nulos (primeiro carregamento)
+  if (isLoadingData && clients === null) return <div className="min-h-screen flex justify-center items-center bg-gray-900"><SpinnerIcon className="w-10 h-10 text-yellow-500 animate-spin" /></div>;
   
   return (
     <div className="min-h-screen bg-black text-gray-200">
@@ -519,12 +523,12 @@ export default function App() {
                 </button>
               )}
             </div>
-            <Dashboard clients={clients} contracts={dashboardContracts} commitments={dashboardCommitments} invoices={dashboardInvoices} onSelectClient={setSelectedClientId} globalSummary={globalSummary} filterYear={filterYear} setFilterYear={setFilterYear} filterMonth={filterMonth} setFilterMonth={setFilterMonth} availableYears={availableYears} onMarkInvoiceAsPaid={handleMarkInvoiceAsPaid} onMarkInvoiceAsUnpaid={handleMarkInvoiceAsUnpaid} onDeleteCommitment={handleDeleteCommitment} onDeleteInvoice={handleDeleteInvoice} isReadOnly={isReadOnly} />
+            <Dashboard clients={clients || []} contracts={dashboardContracts} commitments={dashboardCommitments} invoices={dashboardInvoices} onSelectClient={setSelectedClientId} globalSummary={globalSummary} filterYear={filterYear} setFilterYear={setFilterYear} filterMonth={filterMonth} setFilterMonth={setFilterMonth} availableYears={availableYears} onMarkInvoiceAsPaid={handleMarkInvoiceAsPaid} onMarkInvoiceAsUnpaid={handleMarkInvoiceAsUnpaid} onDeleteCommitment={handleDeleteCommitment} onDeleteInvoice={handleDeleteInvoice} isReadOnly={isReadOnly} />
           </div>
         )}
       </main>
 
-      {isAddingContract && <AddContractModal clients={clients} onClose={() => setIsAddingContract(false)} onAddContract={handleAddContract} />}
+      {isAddingContract && <AddContractModal clients={clients || []} onClose={() => setIsAddingContract(false)} onAddContract={handleAddContract} />}
       {isAdminPanelOpen && <AdminPanel supabase={supabase} onClose={() => setIsAdminPanelOpen(false)} />}
       <ConfirmUpdateModal isOpen={isRestoreConfirmOpen} onClose={() => setIsRestoreConfirmOpen(false)} onConfirm={handleConfirmRestore} title="Confirmar Restauração" message={<><p className="mb-2">Você tem certeza que deseja restaurar os dados?</p><p className="font-bold text-red-500">Atenção: Todos os dados atuais serão substituídos.</p></>} confirmText="Sim, Restaurar Dados" confirmButtonClass="bg-red-600 hover:bg-red-700" />
       {notification && <div className={`fixed bottom-5 right-5 z-50 p-4 rounded-lg shadow-lg text-white animate-fade-in-up ${notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>{notification.message}</div>}

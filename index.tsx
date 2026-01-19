@@ -1,3 +1,4 @@
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -14,19 +15,17 @@ root.render(
   </React.StrictMode>
 );
 
-// PWA Service Worker Registration with update detection
+// PWA Service Worker Registration
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((registration) => {
-      // Monitora atualizações enquanto o app está aberto
+      // Monitora atualizações silenciosamente
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing;
         if (newWorker) {
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // Nova versão pronta, o sw.js já tem skipWaiting(), então apenas recarregamos
-              console.log('Nova versão encontrada! Recarregando...');
-              window.location.reload();
+              console.log('Nova versão baixada em segundo plano. Será aplicada na próxima inicialização.');
             }
           });
         }
@@ -36,12 +35,5 @@ if ('serviceWorker' in navigator) {
     });
   });
 
-  // Força o reload quando o novo SW assume o controle
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!refreshing) {
-      refreshing = true;
-      window.location.reload();
-    }
-  });
+  // Removido o controllerchange reload para evitar resets indesejados durante o uso
 }
