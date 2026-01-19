@@ -197,15 +197,14 @@ export const exportProposalPDF = (data: {
   doc.text(`Valor total: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (${valorPorExtenso(total)})`, margin, totalY);
 
   // SEÇÃO DE ASSINATURA (Logo abaixo do valor total)
-  const signatureY = totalY + 25; // Define a base da assinatura logo abaixo do valor total
+  const signatureY = totalY + 25; 
 
   if (data.digitalCert) {
-    // LAYOUT ASSINATURA DIGITAL
     const boxW = 120;
     const boxX = (pageWidth - boxW) / 2;
     const blockY = signatureY - 10; 
     
-    // 1. Símbolo Squiggle ao fundo
+    // 1. Símbolo Squiggle
     doc.setDrawColor(240, 189, 189);
     doc.setLineWidth(0.8);
     doc.lines([
@@ -213,7 +212,7 @@ export const exportProposalPDF = (data: {
       [5, 10, -10, 10, -15, 0]
     ], boxX + boxW/2 - 10, blockY + 5, [1, 1], 'S');
     
-    // 2. Dados Técnicos da Assinatura
+    // 2. Bloco Técnico
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(0);
@@ -235,7 +234,7 @@ export const exportProposalPDF = (data: {
     doc.setFont('helvetica', 'normal');
     doc.text(`Dados: ${new Date().toLocaleString('pt-BR')} -03'00'`, techX, blockY + 11);
 
-    // 3. NOME E CPF EMBAIXO DA ASSINATURA
+    // 3. Nome e CPF Centralizados (Embaixo)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(0);
@@ -246,7 +245,6 @@ export const exportProposalPDF = (data: {
     doc.text(`CPF: ${data.company.cpf}`, pageWidth / 2, signatureY + 17, { align: 'center' });
 
   } else {
-    // ASSINATURA MANUAL
     if (data.signature) {
       doc.addImage(data.signature, 'PNG', (pageWidth / 2) - 25, signatureY - 22, 50, 20);
     }

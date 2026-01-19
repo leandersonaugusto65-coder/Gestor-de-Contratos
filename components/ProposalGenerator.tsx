@@ -9,7 +9,6 @@ import { CloudArrowUpIcon } from './icons/CloudArrowUpIcon';
 import { exportProposalPDF, valorPorExtenso } from '../utils/export';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
 import { CheckIcon } from './icons/CheckIcon';
-import { PencilIcon } from './icons/PencilIcon';
 import { BookmarkSquareIcon } from './icons/BookmarkSquareIcon';
 import { TrashIcon } from './icons/TrashIcon';
 
@@ -24,6 +23,8 @@ interface DigitalCertInfo {
   issuer: string;
 }
 
+const STORAGE_KEY = 'oda_permanent_cert_pfx';
+
 export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients }) => {
   const [isExtracting, setIsExtracting] = useState(false);
   const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
@@ -35,7 +36,7 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
   const [certInfo, setCertInfo] = useState<DigitalCertInfo | null>(null);
   const [isProcessingCert, setIsProcessingCert] = useState(false);
   const [signatureType, setSignatureType] = useState<'manual' | 'digital'>('manual');
-  const [saveCertPermanently, setSaveCertPermanently] = useState(false);
+  const [saveCertPermanently, setSaveCertPermanently] = useState(true); // Padrão como true
   const [hasStoredCert, setHasStoredCert] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -65,9 +66,9 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
     role: 'PROPRIETÁRIA'
   };
 
-  // Carregar certificado salvo do LocalStorage
+  // Carregar certificado salvo ao iniciar
   useEffect(() => {
-    const saved = localStorage.getItem('oda_stored_cert_pfx');
+    const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       setHasStoredCert(true);
       setSignatureType('digital');
@@ -143,34 +144,39 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
   const processCertificate = async () => {
     setIsProcessingCert(true);
     try {
-      let pfxData: ArrayBuffer;
+      let pfxArrayBuffer: ArrayBuffer;
 
-      // Se tiver certificado salvo, usa ele. Senão usa o arquivo do input.
-      if (hasStoredCert) {
-        const base64 = localStorage.getItem('oda_stored_cert_pfx');
-        if (!base64) throw new Error("Erro ao carregar certificado salvo.");
-        const binaryStr = atob(base64);
+      // Prioridade 1: Usar certificado já salvo no localStorage
+      const savedCertBase64 = localStorage.getItem(STORAGE_KEY);
+      
+      if (savedCertBase64 && !certFile) {
+        const binaryStr = atob(savedCertBase64);
         const len = binaryStr.length;
         const bytes = new Uint8Array(len);
         for (let i = 0; i < len; i++) bytes[i] = binaryStr.charCodeAt(i);
-        pfxData = bytes.buffer;
-      } else {
-        if (!certFile) throw new Error("Selecione um arquivo de certificado.");
-        const reader = new FileReader();
-        pfxData = await new Promise<ArrayBuffer>((resolve) => {
+        pfxArrayBuffer = bytes.buffer;
+      } 
+      // Prioridade 2: Usar novo arquivo selecionado
+      else if (certFile) {
+        pfxArrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+          const reader = new FileReader();
           reader.onload = () => resolve(reader.result as ArrayBuffer);
+          reader.onerror = reject;
           reader.readAsArrayBuffer(certFile);
         });
+      } else {
+        throw new Error("Nenhum certificado selecionado ou salvo.");
       }
 
-      const p12Der = forge.util.createBuffer(new Uint8Array(pfxData).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+      // Descriptografar PFX
+      const p12Der = forge.util.createBuffer(new Uint8Array(pfxArrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
       const p12Asn1 = forge.asn1.fromDer(p12Der);
       const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, certPassword);
       
       const bags = p12.getBags({ bagType: forge.pki.oids.certBag });
       const cert = bags[forge.pki.oids.certBag]![0].cert!;
-      const subject = cert.subject.attributes.map((a: any) => `${a.shortName}=${a.value}`).join(', ');
-      const cnpjMatch = subject.match(/\d{14}/);
+      const subjectAttr = cert.subject.attributes.map((a: any) => `${a.shortName}=${a.value}`).join(', ');
+      const cnpjMatch = subjectAttr.match(/\d{14}/);
       
       const info = {
         subject: cert.subject.getField('CN')?.value || 'Não identificado',
@@ -179,34 +185,32 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
         issuer: cert.issuer.getField('CN')?.value || 'Desconhecido'
       };
 
+      // Se chegamos aqui, a senha está correta.
       setCertInfo(info);
 
-      // Se o usuário marcou para salvar permanentemente e não é o que já estava salvo
-      if (saveCertPermanently && !hasStoredCert && certFile) {
-          const base64 = await fileToBase64String(certFile);
-          localStorage.setItem('oda_stored_cert_pfx', base64);
-          setHasStoredCert(true);
+      // Salvar permanentemente se solicitado
+      if (saveCertPermanently && certFile) {
+          const reader = new FileReader();
+          reader.readAsDataURL(certFile);
+          reader.onload = () => {
+              const base64 = (reader.result as string).split(',')[1];
+              localStorage.setItem(STORAGE_KEY, base64);
+              setHasStoredCert(true);
+          };
       }
 
     } catch (err) {
-      alert("Senha incorreta ou erro ao processar certificado.");
+      console.error(err);
+      alert("Senha incorreta ou erro ao ler o certificado. Tente novamente.");
       setCertInfo(null);
     } finally {
       setIsProcessingCert(false);
     }
   };
 
-  const fileToBase64String = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve((reader.result as string).split(',')[1]);
-        reader.readAsDataURL(file);
-    });
-  };
-
   const removeStoredCert = () => {
-    if (confirm("Deseja remover o certificado salvo deste dispositivo?")) {
-      localStorage.removeItem('oda_stored_cert_pfx');
+    if (confirm("Deseja remover o certificado salvo deste navegador? Você precisará selecionar o arquivo novamente na próxima vez.")) {
+      localStorage.removeItem(STORAGE_KEY);
       setHasStoredCert(false);
       setCertFile(null);
       setCertInfo(null);
@@ -240,7 +244,7 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
         return;
     }
     if (signatureType === 'digital' && !certInfo) {
-        alert("Autentique seu e-CNPJ primeiro com sua senha.");
+        alert("Autentique seu certificado com a senha primeiro.");
         return;
     }
 
@@ -412,10 +416,10 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
                         {!certInfo ? (
                             <div className="bg-black border border-gray-800 rounded-3xl p-6 space-y-4">
                                 {hasStoredCert ? (
-                                    <div className="flex justify-between items-center bg-yellow-500/10 p-3 rounded-xl border border-yellow-500/20">
+                                    <div className="flex justify-between items-center bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
                                         <div className="flex items-center gap-2">
-                                            <BookmarkSquareIcon className="w-4 h-4 text-yellow-500" />
-                                            <span className="text-[10px] font-black text-yellow-500 uppercase">Certificado Salvo Detectado</span>
+                                            <CheckIcon className="w-4 h-4 text-emerald-500" />
+                                            <span className="text-[10px] font-black text-emerald-500 uppercase">Certificado Instalado</span>
                                         </div>
                                         <button onClick={removeStoredCert} className="p-1 text-red-500 hover:bg-red-500/10 rounded-lg transition-all" title="Remover certificado">
                                             <TrashIcon className="w-4 h-4" />
@@ -424,31 +428,31 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
                                 ) : (
                                     <>
                                         <div>
-                                            <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block">Certificado (.pfx / .p12)</label>
+                                            <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block">Selecionar Certificado (.pfx / .p12)</label>
                                             <input type="file" onChange={e => setCertFile(e.target.files?.[0] || null)} className="w-full text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:bg-gray-800 file:text-white" accept=".pfx,.p12" />
                                         </div>
                                         <div className="flex items-center gap-2 px-1">
                                             <input type="checkbox" id="save-cert" checked={saveCertPermanently} onChange={e => setSaveCertPermanently(e.target.checked)} className="rounded border-gray-800 bg-black text-yellow-500" />
-                                            <label htmlFor="save-cert" className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer">Salvar neste computador</label>
+                                            <label htmlFor="save-cert" className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer">Salvar neste dispositivo</label>
                                         </div>
                                     </>
                                 )}
                                 <div>
                                     <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block">Senha do Certificado</label>
-                                    <input type="password" value={certPassword} onChange={e => setCertPassword(e.target.value)} className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-white text-sm" placeholder="••••••••" />
+                                    <input type="password" value={certPassword} onChange={e => setCertPassword(e.target.value)} className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-white text-sm" placeholder="Digite sua senha" />
                                 </div>
                                 <button onClick={processCertificate} disabled={(!certFile && !hasStoredCert) || !certPassword || isProcessingCert} className="w-full bg-yellow-500 hover:bg-yellow-600 disabled:opacity-30 text-black font-black py-3 rounded-xl uppercase text-xs tracking-widest shadow-lg" >
-                                    {isProcessingCert ? 'Autenticando...' : 'Autenticar e Assinar'}
+                                    {isProcessingCert ? 'Autenticando...' : 'Autenticar e Preparar'}
                                 </button>
                             </div>
                         ) : (
                             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-3xl p-6 flex items-start gap-4">
                                 <div className="p-3 bg-emerald-500/20 rounded-2xl text-emerald-500"><BookmarkSquareIcon className="w-6 h-6" /></div>
                                 <div className="flex-1 min-w-0">
-                                    <h4 className="text-emerald-500 font-black text-xs uppercase tracking-widest mb-1">e-CNPJ Ativo</h4>
+                                    <h4 className="text-emerald-500 font-black text-xs uppercase tracking-widest mb-1">e-CNPJ Autenticado</h4>
                                     <p className="text-white font-bold text-sm truncate">{certInfo.subject}</p>
                                     <p className="text-gray-500 text-[10px] mt-1">CNPJ: {certInfo.cnpj} | Vencimento: {certInfo.expiry}</p>
-                                    <button onClick={() => {setCertInfo(null); setCertFile(null); setCertPassword('');}} className="mt-4 text-[9px] font-black text-red-500 uppercase hover:underline">Trocar Certificado</button>
+                                    <button onClick={() => {setCertInfo(null); setCertPassword('');}} className="mt-4 text-[9px] font-black text-red-500 uppercase hover:underline">Trocar ou Limpar</button>
                                 </div>
                             </div>
                         )}
