@@ -26,7 +26,8 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({ headers, data, f
   };
 
   const handleExportPDF = () => {
-    exportToPDF(headers, data, filenamePrefix, pdfTitle, pdfSubtitle);
+    // Fix: removed the unused pdfSubtitle argument to match the exportToPDF signature in utils/export.ts
+    exportToPDF(headers, data, filenamePrefix, pdfTitle);
     setIsOpen(false);
   };
   

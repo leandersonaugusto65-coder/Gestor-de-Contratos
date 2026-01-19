@@ -2,39 +2,52 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// Função para converter caracteres problemáticos para mobile em equivalentes seguros
+/**
+ * Converte caracteres especiais para seus equivalentes visuais simples.
+ * Resolve o erro de caracteres corrompidos (ï¿½) mantendo a legibilidade.
+ */
 const safeText = (text: string | number | undefined | null): string => {
   if (text === undefined || text === null) return '';
-  return String(text)
-    .replace(/[º°]/g, 'N.')
-    .replace(/[ª]/g, 'a.')
-    .replace(/[–—]/g, '-')
-    .replace(/[“”]/g, '"')
-    .replace(/[‘’]/g, "'")
-    .normalize('NFC'); // Garante normalização Unicode
+  const str = String(text);
+  
+  const map: Record<string, string> = {
+    'á': 'a', 'à': 'a', 'ã': 'a', 'â': 'a', 'é': 'e', 'ê': 'e', 'í': 'i', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ú': 'u', 'ç': 'c',
+    'Á': 'A', 'À': 'A', 'Ã': 'A', 'Â': 'A', 'É': 'E', 'Ê': 'E', 'Í': 'I', 'Ó': 'O', 'Ô': 'O', 'Õ': 'O', 'Ú': 'U', 'Ç': 'C',
+    'º': '.', 'ª': 'a', '°': '.', '–': '-', '—': '-', '“': '"', '”': '"', '‘': "'", '’': "'"
+  };
+
+  return str.replace(/[áàãâéêíóôõúçÁÀÃÂÉÊÍÓÔÕÚÇºª°–—“”‘’]/g, m => map[m] || m)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, "");
 };
 
-const escapeCSV = (field: any): string => {
-    const str = String(field ?? '');
-    if (/[",\n]/.test(str)) {
-        return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
+/**
+ * Gera um código de autenticidade único para conferência.
+ */
+const generateAuthCode = (cnpj: string, value: number): string => {
+  const seed = `${cnpj}-${value}-${Date.now()}`;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(36).toUpperCase().padEnd(12, 'X').slice(0, 16).replace(/(.{4})/g, '$1.').slice(0, -1);
 };
 
-// Função de limpeza agressiva para nomes de arquivos (fundamental para mobile)
 const sanitizeFilename = (name: string): string => {
   return name
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-zA-Z0-9_-]/g, '_') // Troca TUDO que não for letra/número por underscore
-    .replace(/__+/g, '_')           // Remove underscores duplicados
-    .replace(/^_|_$/g, '');         // Remove underscores no início ou fim
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/__+/g, '_')
+    .replace(/^_|_$/g, '')
+    .toUpperCase()
+    .trim();
 };
 
-// Função auxiliar para forçar download no mobile com extensão correta
 const forceDownload = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob);
+    const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.setAttribute('download', filename);
@@ -43,53 +56,49 @@ const forceDownload = (blob: Blob, filename: string) => {
     link.click();
     setTimeout(() => {
         document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    }, 100);
+        window.URL.revokeObjectURL(url);
+    }, 600);
 };
 
 export const exportToCSV = (headers: string[], data: any[][], filename: string): void => {
     try {
         const csvContent = [
-            headers.map(h => safeText(h)).map(escapeCSV).join(','),
-            ...data.map(row => row.map(cell => safeText(cell)).map(escapeCSV).join(','))
+            headers.map(h => safeText(h)).join(','),
+            ...data.map(row => row.map(cell => `"${safeText(cell)}"`).join(','))
         ].join('\n');
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const safeName = `${sanitizeFilename(filename)}.csv`;
-        forceDownload(blob, safeName);
+        forceDownload(blob, `${sanitizeFilename(filename)}.csv`);
     } catch (error) {
-        console.error("Erro ao exportar para CSV:", error);
+        console.error("Erro CSV:", error);
     }
 };
 
-export const exportToPDF = (headers: string[], data: any[][], filename: string, title: string, subtitle?: string): void => {
+export const exportToPDF = (headers: string[], data: any[][], filename: string, title: string): void => {
     try {
         const doc = new jsPDF({ orientation: 'landscape' });
-        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
         doc.text(safeText(title), 14, 20);
         
-        const safeData = data.map(row => row.map(cell => safeText(cell)));
-        const safeHeaders = headers.map(h => safeText(h));
-
         autoTable(doc, {
-            head: [safeHeaders],
-            body: safeData,
+            head: [headers.map(h => safeText(h))],
+            body: data.map(row => row.map(cell => safeText(cell))),
             startY: 30,
             theme: 'grid',
             headStyles: { fillColor: [202, 138, 4], textColor: [255, 255, 255] },
+            styles: { font: 'helvetica' }
         });
 
         const blob = doc.output('blob');
-        const safeName = `${sanitizeFilename(filename)}.pdf`;
-        forceDownload(blob, safeName);
+        forceDownload(blob, `${sanitizeFilename(filename)}.pdf`);
     } catch (error) {
-        console.error("Erro ao exportar para PDF:", error);
+        console.error("Erro PDF:", error);
     }
 };
 
 export const valorPorExtenso = (valor: number): string => {
   if (valor === 0) return 'Zero Reais';
-  const unidades = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
+  const unidades = ['', 'um', 'dois', 'tres', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
   const dezenaEspecial = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
   const dezenas = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
   const centenas = ['', 'cem', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
@@ -151,54 +160,66 @@ export const exportProposalPDF = (data: {
   const amareloOficina = [234, 179, 8];
   const pretoOficina = [30, 30, 30];
 
-  // Configura fonte padrão para garantir máxima compatibilidade
   doc.setFont('helvetica', 'normal');
 
-  // Faixa topo
+  // Cabeçalho
   doc.setFillColor(amareloOficina[0], amareloOficina[1], amareloOficina[2]);
   doc.rect(0, 0, pageWidth, 5, 'F');
   
-  // Cabeçalho
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
+  doc.setFontSize(14);
   doc.setTextColor(0);
-  doc.text(safeText(data.company.name), margin, 25);
+  doc.text(safeText(data.company.name), margin, 20);
   
-  doc.setDrawColor(amareloOficina[0], amareloOficina[1], amareloOficina[2]);
-  doc.setLineWidth(1.5);
-  doc.line(margin - 2, 30, margin - 2, 45);
-
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(80);
-  const splitAddress = doc.splitTextToSize(safeText(data.company.address), 120);
-  doc.text(splitAddress, margin, 32);
+  const splitAddress = doc.splitTextToSize(safeText(data.company.address), pageWidth - (margin * 2));
+  doc.text(splitAddress, margin, 25);
   
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0);
-  doc.text(`CNPJ: ${safeText(data.company.cnpj)} | IE: ${safeText(data.company.ie)}`, margin, 40);
-  doc.text(`Fone: ${safeText(data.company.phone)} | Email: ${safeText(data.company.email)}`, margin, 44);
+  doc.text(`CNPJ: ${safeText(data.company.cnpj)} | IE: ${safeText(data.company.ie)}`, margin, 35);
+  doc.text(`Fone: ${safeText(data.company.phone)} | Email: ${safeText(data.company.email)}`, margin, 39);
 
   doc.setDrawColor(200);
-  doc.setLineWidth(0.3);
-  doc.line(margin, 48, pageWidth - margin, 48);
+  doc.line(margin, 43, pageWidth - margin, 43);
 
-  // Referência
+  // Titulo Proposta
+  const clientUpper = safeText(data.client.name).toUpperCase();
   doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.text(safeText(data.client.name).toUpperCase(), pageWidth / 2, 60, { align: 'center' });
-  
+  doc.text(clientUpper, pageWidth / 2, 55, { align: 'center' });
   doc.setFontSize(10);
-  doc.text(`UASG: ${safeText(data.client.uasg)}`, pageWidth / 2, 66, { align: 'center' });
+  doc.text(`UASG: ${safeText(data.client.uasg)}`, pageWidth / 2, 61, { align: 'center' });
   
   doc.setFillColor(amareloOficina[0], amareloOficina[1], amareloOficina[2]);
   const processText = `Proposta Comercial - Processo N. ${safeText(data.client.biddingId)}`;
   const processWidth = doc.getTextWidth(processText) + 10;
-  doc.rect((pageWidth - processWidth) / 2, 69, processWidth, 6, 'F');
+  doc.rect((pageWidth - processWidth) / 2, 64, processWidth, 7, 'F');
   doc.setTextColor(255);
-  doc.text(processText, pageWidth / 2, 73.5, { align: 'center' });
+  doc.text(processText, pageWidth / 2, 69, { align: 'center' });
 
-  // Itens
+  // --- NOVO TEXTO DE APRESENTAÇÃO ---
+  let currentY = 82;
+  doc.setTextColor(0);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  
+  doc.text(`A ${clientUpper}`, margin, currentY);
+  currentY += 8;
+
+  doc.setFontSize(10);
+  const introText = `A Oficina da Arte, inscrita sob o CNPJ n 27.454.615/0001-44, declara seu pleno interesse em fornecer os materiais referentes ao processo n ${safeText(data.client.biddingId)}, submetendo-se integralmente as condicoes e exigencias estabelecidas no edital.`;
+  const splitIntro = doc.splitTextToSize(introText, pageWidth - (margin * 2));
+  doc.text(splitIntro, margin, currentY);
+  currentY += (splitIntro.length * 5) + 2;
+
+  const capacityText = `Reiteramos nossa total disponibilidade e capacidade tecnica para atender as demandas desta prestigiada instituicao, garantindo o estrito cumprimento dos prazos e a qualidade dos itens solicitados.`;
+  const splitCapacity = doc.splitTextToSize(capacityText, pageWidth - (margin * 2));
+  doc.text(splitCapacity, margin, currentY);
+  currentY += (splitCapacity.length * 5) + 8;
+
+  // Tabela de Itens
   const tableData = data.items.map(item => [
     safeText(item.item),
     safeText(item.description).toUpperCase(),
@@ -213,95 +234,131 @@ export const exportProposalPDF = (data: {
   const total = data.items.reduce((s, i) => s + (i.unitValue * i.quantityBid), 0);
 
   autoTable(doc, {
-    startY: 90,
+    startY: currentY,
     head: [['ITEM', 'DESCRICAO', 'MODELO', 'MARCA', 'QUANT.', 'UNID.', 'VALOR', 'TOTAL']],
     body: tableData,
     theme: 'grid',
-    headStyles: { fillColor: pretoOficina, textColor: [255, 255, 255], fontSize: 7.5, halign: 'center' },
-    styles: { font: 'helvetica', fontSize: 6.5, cellPadding: 2, textColor: [0, 0, 0], halign: 'center', overflow: 'linebreak' },
+    headStyles: { fillColor: pretoOficina, textColor: [255, 255, 255], fontSize: 8 },
+    styles: { font: 'helvetica', fontSize: 7, textColor: [0, 0, 0] },
     columnStyles: { 
-      0: { cellWidth: 10 }, 
-      1: { cellWidth: 'auto', halign: 'left' }, 
-      4: { cellWidth: 15 },
-      5: { cellWidth: 12 },
-      6: { cellWidth: 28 },
-      7: { cellWidth: 32, fontStyle: 'bold' }
+      1: { cellWidth: 'auto' }, 
+      6: { cellWidth: 25, halign: 'right' },
+      7: { cellWidth: 25, halign: 'right', fontStyle: 'bold' }
     }
   });
 
-  let finalY = (doc as any).lastAutoTable.finalY;
+  let finalY = (doc as any).lastAutoTable.finalY || currentY + 20;
   
-  doc.setFontSize(10);
+  // Total e Extenso
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0);
-  const totalY = finalY + 12;
+  const totalY = finalY + 10;
   const extenso = valorPorExtenso(total);
-  doc.text(safeText(`Valor total: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (${extenso})`), margin, totalY);
+  doc.text(`Valor total: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (${safeText(extenso)})`, margin, totalY);
 
-  // SEÇÃO DE ASSINATURA
-  const signatureY = totalY + 25; 
+  // Condições Gerais
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  const infoY = totalY + 10;
+  doc.text(`Prazo de Entrega: ${safeText(data.proposal.delivery)}`, margin, infoY);
+  doc.text(`Validade da Proposta: ${safeText(data.proposal.validity)}`, margin, infoY + 4);
+  doc.text(`Pagamento: ${safeText(data.proposal.payment)}`, margin, infoY + 8);
+  doc.text(`Dados Bancarios: ${safeText(data.proposal.bankInfo)}`, margin, infoY + 12);
+
+  // --- SEÇÃO DE ASSINATURA PADRÃO ADOBE (IMAGEM 2) ---
+  const signatureStartY = infoY + 30;
+  const boxWidth = 90; // Largura do bloco de assinatura estilo Adobe
+  const boxHeight = 28;
+  const boxX = (pageWidth / 2) - (boxWidth / 2);
 
   if (data.digitalCert) {
-    const boxW = 120;
-    const boxX = (pageWidth - boxW) / 2;
-    const blockY = signatureY - 10; 
-    
-    // Símbolo visual simplificado
-    doc.setDrawColor(240, 189, 189);
-    doc.setLineWidth(0.8);
-    doc.line(boxX + boxW/2 - 5, blockY + 5, boxX + boxW/2 + 5, blockY + 15);
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    const mainCertText = `${safeText(data.digitalCert.subject)}:${safeText(data.digitalCert.cnpj)}`;
-    const splitCert = doc.splitTextToSize(mainCertText, 65);
-    doc.text(splitCert, boxX, blockY + 8);
-
-    doc.setDrawColor(230);
+    // 1. Box Externo (Cinza claro discreto)
+    doc.setDrawColor(220);
     doc.setLineWidth(0.1);
-    doc.line(boxX + 68, blockY + 2, boxX + 68, blockY + 16);
+    doc.rect(boxX, signatureStartY, boxWidth, boxHeight);
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6);
-    doc.setTextColor(80);
-    const techX = boxX + 71;
-    doc.text(`Assinado de forma digital por`, techX, blockY + 5);
+    // 2. Marca d'água sutil (Estilo Adobe PDF)
+    doc.setTextColor(245, 230, 230); // Vermelho muito pálido
+    doc.setFontSize(32);
     doc.setFont('helvetica', 'bold');
-    doc.text(safeText(data.digitalCert.subject.split(':')[0]), techX, blockY + 8);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Dados: ${new Date().toLocaleString('pt-BR')} -03'00'`, techX, blockY + 11);
+    doc.text("A", boxX + (boxWidth / 2), signatureStartY + 20, { align: 'center' });
 
+    // 3. Lado Esquerdo: Nome em Destaque
+    doc.setTextColor(30);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    
+    // Split text to fit left half
+    const signerName = safeText(data.digitalCert.subject);
+    const leftText = doc.splitTextToSize(signerName, (boxWidth / 2) - 5);
+    doc.text(leftText, boxX + 3, signatureStartY + 8);
+
+    // 4. Linha Divisória Vertical Central
+    doc.setDrawColor(235);
+    doc.line(boxX + (boxWidth / 2), signatureStartY + 3, boxX + (boxWidth / 2), signatureStartY + boxHeight - 3);
+
+    // 5. Lado Direito: Detalhes Técnicos
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(60);
+    
+    const rightX = boxX + (boxWidth / 2) + 3;
+    let currentRY = signatureStartY + 6;
+    
+    doc.text("Assinado de forma digital por", rightX, currentRY);
+    currentRY += 3;
+    
+    doc.setFont('helvetica', 'bold');
+    const rightName = doc.splitTextToSize(signerName, (boxWidth / 2) - 6);
+    doc.text(rightName, rightX, currentRY);
+    currentRY += (rightName.length * 3);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Dados: ${new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '')} -03'00'`, rightX, currentRY);
+    
+    // 6. Código de Autenticidade (Discreto na parte inferior)
+    const authCode = generateAuthCode(data.digitalCert.cnpj, total);
+    doc.setFontSize(5);
+    doc.setTextColor(150);
+    doc.text(`HASH: ${authCode}`, boxX + 3, signatureStartY + boxHeight - 2);
+
+    // --- DADOS DO PROPRIETÁRIO ABAIXO DA ASSINATURA ---
+    const detailY = signatureStartY + boxHeight + 10;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(0);
-    doc.text(safeText(data.company.owner), pageWidth / 2, signatureY + 12, { align: 'center' });
+    doc.text(safeText(data.company.owner), pageWidth / 2, detailY, { align: 'center' });
+    
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text(`CPF: ${safeText(data.company.cpf)}`, pageWidth / 2, signatureY + 17, { align: 'center' });
+    doc.setFontSize(8);
+    doc.text(safeText(data.company.role), pageWidth / 2, detailY + 5, { align: 'center' });
+    doc.text(`CPF: ${safeText(data.company.cpf)}`, pageWidth / 2, detailY + 9, { align: 'center' });
 
   } else {
+    // Assinatura Manual Padrão
     if (data.signature) {
-      doc.addImage(data.signature, 'PNG', (pageWidth / 2) - 25, signatureY - 22, 50, 20);
+      doc.addImage(data.signature, 'PNG', (pageWidth / 2) - 25, signatureStartY - 15, 50, 15);
     }
     doc.setDrawColor(0);
-    doc.setLineWidth(0.3);
-    doc.line(pageWidth / 2 - 45, signatureY, pageWidth / 2 + 45, signatureY);
+    doc.setLineWidth(0.2);
+    doc.line(pageWidth / 2 - 40, signatureStartY + 5, pageWidth / 2 + 40, signatureStartY + 5);
+    
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.text(safeText(data.company.owner), pageWidth / 2, signatureY + 6, { align: 'center' });
+    doc.text(safeText(data.company.owner), pageWidth / 2, signatureStartY + 11, { align: 'center' });
+    
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text(`CPF: ${safeText(data.company.cpf)}`, pageWidth / 2, signatureY + 11, { align: 'center' });
+    doc.setFontSize(8);
+    doc.text(safeText(data.company.role), pageWidth / 2, signatureStartY + 16, { align: 'center' });
+    doc.text(`CPF: ${safeText(data.company.cpf)}`, pageWidth / 2, signatureStartY + 20, { align: 'center' });
   }
 
-  // NOME DO ARQUIVO: Tipo_Numero_UASG.pdf
-  const biddingType = (data.proposal.biddingType || 'Proposta').toUpperCase();
-  const biddingNum = data.client.biddingId || 'SN';
+  // Nome do Arquivo TIPO_NUMERO_UASG.pdf
+  const type = (data.proposal.biddingType || 'PROPOSTA').toUpperCase();
+  const num = (data.client.biddingId || 'SN').replace(/\//g, '_');
   const uasg = data.client.uasg || '000000';
-  
-  const rawFilename = `${biddingType}_${biddingNum}_UASG_${uasg}`;
-  const finalFilename = `${sanitizeFilename(rawFilename)}.pdf`;
+  const finalFilename = `${sanitizeFilename(`${type}_${num}_UASG_${uasg}`)}.pdf`;
 
   const blob = doc.output('blob');
   forceDownload(blob, finalFilename);
