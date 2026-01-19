@@ -16,6 +16,8 @@ import { InvoiceDetailModal } from './InvoiceDetailModal';
 import { ExportDropdown } from './ExportDropdown';
 import { FinancialBreakdown } from './FinancialBreakdown';
 import { ProposalGenerator } from './ProposalGenerator';
+import { HabilitacaoView } from './HabilitacaoView';
+import { IdentificationIcon } from './icons/IdentificationIcon';
 import { formatCNPJ } from '../utils/cnpj';
 
 interface DashboardProps {
@@ -136,11 +138,12 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     
     return (
         <div className="space-y-8">
-            <div className="grid grid-cols-5 gap-2 sm:gap-4">
+            <div className="grid grid-cols-3 gap-4 sm:gap-6">
                 <NavButton label="Geral" icon={<BanknotesIcon />} isActive={activeView === 'finance'} onClick={() => setActiveView('finance')} />
                 <NavButton label="Contratos" icon={<DocumentDuplicateIcon />} isActive={activeView === 'contracts'} onClick={() => setActiveView('contracts')} />
                 <NavButton label="Fornecimento" icon={<ClipboardDocumentListIcon />} isActive={activeView === 'commitments'} onClick={() => setActiveView('commitments')} />
                 <NavButton label="Pagamentos" icon={<ClipboardDocumentCheckIcon />} isActive={activeView === 'invoices'} onClick={() => setActiveView('invoices')} />
+                <NavButton label="Habilitação" icon={<IdentificationIcon />} isActive={activeView === 'habilitação'} onClick={() => setActiveView('habilitação')} />
                 <NavButton label="Proposta" icon={<WrenchScrewdriverIcon />} isActive={activeView === 'proposal'} onClick={() => setActiveView('proposal')} />
             </div>
 
@@ -150,9 +153,10 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                        {activeView === 'finance' ? 'Gestão Financeira Global' : 
                         activeView === 'commitments' ? 'Fornecimento Pendente' : 
                         activeView === 'invoices' ? 'Pagamentos Pendentes' : 
-                        activeView === 'proposal' ? 'Gerador de Propostas Comerciais' : 'Contratos Ativos'}
+                        activeView === 'proposal' ? 'Gerador de Propostas Comerciais' : 
+                        activeView === 'habilitação' ? 'Documentos de Habilitação' : 'Contratos Ativos'}
                     </h2>
-                    {activeView !== 'proposal' && (
+                    {activeView !== 'proposal' && activeView !== 'habilitação' && (
                         <div className="flex w-full sm:w-auto items-center gap-3">
                             <div className="flex items-center bg-gray-900 border border-gray-700 rounded-lg p-1">
                                 <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="bg-transparent border-none text-white text-xs font-bold py-1.5 px-3 focus:ring-0 cursor-pointer">
@@ -189,6 +193,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                     {activeView === 'commitments' && <AllCommitmentsView commitments={pendingCommitments} onSelectCommitment={setSelectedCommitment} />}
                     {activeView === 'invoices' && <AllInvoicesView invoices={pendingInvoices} onSelectInvoice={setSelectedInvoice} />}
                     {activeView === 'proposal' && <ProposalGenerator clients={clients} storedCert={storedCert} onSaveCert={onSaveCert} />}
+                    {activeView === 'habilitação' && <HabilitacaoView />}
                     {activeView === 'contracts' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {contracts.length > 0 ? (

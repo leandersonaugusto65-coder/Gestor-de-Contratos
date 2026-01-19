@@ -113,4 +113,4 @@ export interface DashboardInvoice extends Invoice {
   contractId: number;
 }
 
-export type DashboardView = 'finance' | 'contracts' | 'commitments' | 'invoices' | 'proposal';
+export type DashboardView = 'finance' | 'contracts' | 'commitments' | 'invoices' | 'proposal' | 'habilitação';
