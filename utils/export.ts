@@ -2,6 +2,18 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// Função para converter caracteres problemáticos para mobile em equivalentes seguros
+const safeText = (text: string | number | undefined | null): string => {
+  if (text === undefined || text === null) return '';
+  return String(text)
+    .replace(/[º°]/g, 'N.')
+    .replace(/[ª]/g, 'a.')
+    .replace(/[–—]/g, '-')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .normalize('NFC'); // Garante normalização Unicode
+};
+
 const escapeCSV = (field: any): string => {
     const str = String(field ?? '');
     if (/[",\n]/.test(str)) {
@@ -10,33 +22,41 @@ const escapeCSV = (field: any): string => {
     return str;
 };
 
-// Função para sanitizar nomes de arquivos para dispositivos móveis
+// Função de limpeza agressiva para nomes de arquivos (fundamental para mobile)
 const sanitizeFilename = (name: string): string => {
   return name
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[/\\?%*:|"<>]/g, '-')  // Remove caracteres proibidos em sistemas de arquivos
-    .replace(/\s+/g, '_')           // Substitui espaços por underline
-    .replace(/[^\w.-]/g, '');       // Remove qualquer outro caractere especial
+    .replace(/[^a-zA-Z0-9_-]/g, '_') // Troca TUDO que não for letra/número por underscore
+    .replace(/__+/g, '_')           // Remove underscores duplicados
+    .replace(/^_|_$/g, '');         // Remove underscores no início ou fim
+};
+
+// Função auxiliar para forçar download no mobile com extensão correta
+const forceDownload = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }, 100);
 };
 
 export const exportToCSV = (headers: string[], data: any[][], filename: string): void => {
     try {
         const csvContent = [
-            headers.map(escapeCSV).join(','),
-            ...data.map(row => row.map(escapeCSV).join(','))
+            headers.map(h => safeText(h)).map(escapeCSV).join(','),
+            ...data.map(row => row.map(cell => safeText(cell)).map(escapeCSV).join(','))
         ].join('\n');
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        const safeName = sanitizeFilename(filename);
-        a.download = `${safeName}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        const safeName = `${sanitizeFilename(filename)}.csv`;
+        forceDownload(blob, safeName);
     } catch (error) {
         console.error("Erro ao exportar para CSV:", error);
     }
@@ -46,16 +66,22 @@ export const exportToPDF = (headers: string[], data: any[][], filename: string, 
     try {
         const doc = new jsPDF({ orientation: 'landscape' });
         doc.setFontSize(16);
-        doc.text(title, 14, 20);
+        doc.text(safeText(title), 14, 20);
+        
+        const safeData = data.map(row => row.map(cell => safeText(cell)));
+        const safeHeaders = headers.map(h => safeText(h));
+
         autoTable(doc, {
-            head: [headers],
-            body: data,
+            head: [safeHeaders],
+            body: safeData,
             startY: 30,
             theme: 'grid',
             headStyles: { fillColor: [202, 138, 4], textColor: [255, 255, 255] },
         });
-        const safeName = sanitizeFilename(filename);
-        doc.save(`${safeName}.pdf`);
+
+        const blob = doc.output('blob');
+        const safeName = `${sanitizeFilename(filename)}.pdf`;
+        forceDownload(blob, safeName);
     } catch (error) {
         console.error("Erro ao exportar para PDF:", error);
     }
@@ -99,7 +125,7 @@ export const valorPorExtenso = (valor: number): string => {
     const milhoes = Math.floor(inteiro / 1000000);
     const milhares = Math.floor((inteiro % 1000000) / 1000);
     const resto = inteiro % 1000;
-    if (milhoes > 0) partes.push(converterParte(milhoes) + (milhoes === 1 ? ' milhão' : ' milhões'));
+    if (milhoes > 0) partes.push(converterParte(milhoes) + (milhoes === 1 ? ' milhao' : ' milhoes'));
     if (milhares > 0) partes.push(converterParte(milhares) + ' mil');
     if (resto > 0) partes.push(converterParte(resto));
     const textoInteiro = partes.join(', ').replace(/, ([^,]*)$/, ' e $1');
@@ -108,7 +134,7 @@ export const valorPorExtenso = (valor: number): string => {
   }
   if (centavos > 0) partes.push(converterParte(centavos) + (centavos === 1 ? ' centavo' : ' centavos'));
   const final = partes.join(' e ');
-  return final.charAt(0).toUpperCase() + final.slice(1);
+  return safeText(final.charAt(0).toUpperCase() + final.slice(1));
 };
 
 export const exportProposalPDF = (data: {
@@ -125,6 +151,9 @@ export const exportProposalPDF = (data: {
   const amareloOficina = [234, 179, 8];
   const pretoOficina = [30, 30, 30];
 
+  // Configura fonte padrão para garantir máxima compatibilidade
+  doc.setFont('helvetica', 'normal');
+
   // Faixa topo
   doc.setFillColor(amareloOficina[0], amareloOficina[1], amareloOficina[2]);
   doc.rect(0, 0, pageWidth, 5, 'F');
@@ -133,7 +162,7 @@ export const exportProposalPDF = (data: {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
   doc.setTextColor(0);
-  doc.text(data.company.name, margin, 25);
+  doc.text(safeText(data.company.name), margin, 25);
   
   doc.setDrawColor(amareloOficina[0], amareloOficina[1], amareloOficina[2]);
   doc.setLineWidth(1.5);
@@ -142,13 +171,13 @@ export const exportProposalPDF = (data: {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(80);
-  const splitAddress = doc.splitTextToSize(data.company.address, 120);
+  const splitAddress = doc.splitTextToSize(safeText(data.company.address), 120);
   doc.text(splitAddress, margin, 32);
   
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0);
-  doc.text(`CNPJ: ${data.company.cnpj} | IE: ${data.company.ie}`, margin, 40);
-  doc.text(`Fone: ${data.company.phone} | Email: ${data.company.email}`, margin, 44);
+  doc.text(`CNPJ: ${safeText(data.company.cnpj)} | IE: ${safeText(data.company.ie)}`, margin, 40);
+  doc.text(`Fone: ${safeText(data.company.phone)} | Email: ${safeText(data.company.email)}`, margin, 44);
 
   doc.setDrawColor(200);
   doc.setLineWidth(0.3);
@@ -157,14 +186,13 @@ export const exportProposalPDF = (data: {
   // Referência
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text(data.client.name.toUpperCase(), pageWidth / 2, 60, { align: 'center' });
+  doc.text(safeText(data.client.name).toUpperCase(), pageWidth / 2, 60, { align: 'center' });
   
   doc.setFontSize(10);
-  doc.text(`UASG: ${data.client.uasg}`, pageWidth / 2, 66, { align: 'center' });
+  doc.text(`UASG: ${safeText(data.client.uasg)}`, pageWidth / 2, 66, { align: 'center' });
   
   doc.setFillColor(amareloOficina[0], amareloOficina[1], amareloOficina[2]);
-  // Alterado "nº" para "N." para evitar problemas de caracteres em alguns celulares
-  const processText = `Proposta Comercial - Processo N. ${data.client.biddingId}`;
+  const processText = `Proposta Comercial - Processo N. ${safeText(data.client.biddingId)}`;
   const processWidth = doc.getTextWidth(processText) + 10;
   doc.rect((pageWidth - processWidth) / 2, 69, processWidth, 6, 'F');
   doc.setTextColor(255);
@@ -172,11 +200,11 @@ export const exportProposalPDF = (data: {
 
   // Itens
   const tableData = data.items.map(item => [
-    item.item,
-    item.description.toUpperCase(),
+    safeText(item.item),
+    safeText(item.description).toUpperCase(),
     '2026',
     'ODA',
-    item.quantityBid,
+    safeText(item.quantityBid),
     'UNID.',
     item.unitValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
     (item.unitValue * item.quantityBid).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -186,11 +214,11 @@ export const exportProposalPDF = (data: {
 
   autoTable(doc, {
     startY: 90,
-    head: [['ITEM', 'DESCRIÇÃO', 'MODELO', 'MARCA', 'QUANT.', 'UNID.', 'VALOR', 'TOTAL']],
+    head: [['ITEM', 'DESCRICAO', 'MODELO', 'MARCA', 'QUANT.', 'UNID.', 'VALOR', 'TOTAL']],
     body: tableData,
     theme: 'grid',
     headStyles: { fillColor: pretoOficina, textColor: [255, 255, 255], fontSize: 7.5, halign: 'center' },
-    styles: { fontSize: 6.5, cellPadding: 2, textColor: [0, 0, 0], halign: 'center', overflow: 'linebreak' },
+    styles: { font: 'helvetica', fontSize: 6.5, cellPadding: 2, textColor: [0, 0, 0], halign: 'center', overflow: 'linebreak' },
     columnStyles: { 
       0: { cellWidth: 10 }, 
       1: { cellWidth: 'auto', halign: 'left' }, 
@@ -207,7 +235,8 @@ export const exportProposalPDF = (data: {
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0);
   const totalY = finalY + 12;
-  doc.text(`Valor total: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (${valorPorExtenso(total)})`, margin, totalY);
+  const extenso = valorPorExtenso(total);
+  doc.text(safeText(`Valor total: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (${extenso})`), margin, totalY);
 
   // SEÇÃO DE ASSINATURA
   const signatureY = totalY + 25; 
@@ -217,19 +246,15 @@ export const exportProposalPDF = (data: {
     const boxX = (pageWidth - boxW) / 2;
     const blockY = signatureY - 10; 
     
-    // 1. Símbolo
+    // Símbolo visual simplificado
     doc.setDrawColor(240, 189, 189);
     doc.setLineWidth(0.8);
-    doc.lines([
-      [5, 5, 10, -5, 15, 0], 
-      [5, 10, -10, 10, -15, 0]
-    ], boxX + boxW/2 - 10, blockY + 5, [1, 1], 'S');
+    doc.line(boxX + boxW/2 - 5, blockY + 5, boxX + boxW/2 + 5, blockY + 15);
     
-    // 2. Bloco Técnico
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(0);
-    const mainCertText = `${data.digitalCert.subject}:${data.digitalCert.cnpj}`;
+    const mainCertText = `${safeText(data.digitalCert.subject)}:${safeText(data.digitalCert.cnpj)}`;
     const splitCert = doc.splitTextToSize(mainCertText, 65);
     doc.text(splitCert, boxX, blockY + 8);
 
@@ -243,19 +268,17 @@ export const exportProposalPDF = (data: {
     const techX = boxX + 71;
     doc.text(`Assinado de forma digital por`, techX, blockY + 5);
     doc.setFont('helvetica', 'bold');
-    doc.text(data.digitalCert.subject.split(':')[0], techX, blockY + 8);
+    doc.text(safeText(data.digitalCert.subject.split(':')[0]), techX, blockY + 8);
     doc.setFont('helvetica', 'normal');
     doc.text(`Dados: ${new Date().toLocaleString('pt-BR')} -03'00'`, techX, blockY + 11);
 
-    // 3. Nome e CPF
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(0);
-    doc.text(data.company.owner, pageWidth / 2, signatureY + 12, { align: 'center' });
-    
+    doc.text(safeText(data.company.owner), pageWidth / 2, signatureY + 12, { align: 'center' });
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text(`CPF: ${data.company.cpf}`, pageWidth / 2, signatureY + 17, { align: 'center' });
+    doc.text(`CPF: ${safeText(data.company.cpf)}`, pageWidth / 2, signatureY + 17, { align: 'center' });
 
   } else {
     if (data.signature) {
@@ -264,23 +287,22 @@ export const exportProposalPDF = (data: {
     doc.setDrawColor(0);
     doc.setLineWidth(0.3);
     doc.line(pageWidth / 2 - 45, signatureY, pageWidth / 2 + 45, signatureY);
-    
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.text(data.company.owner, pageWidth / 2, signatureY + 6, { align: 'center' });
-    
+    doc.text(safeText(data.company.owner), pageWidth / 2, signatureY + 6, { align: 'center' });
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text(`CPF: ${data.company.cpf}`, pageWidth / 2, signatureY + 11, { align: 'center' });
+    doc.text(`CPF: ${safeText(data.company.cpf)}`, pageWidth / 2, signatureY + 11, { align: 'center' });
   }
 
-  // NOVA LÓGICA DE NOME DE ARQUIVO: Tipo_Numero_UASG.pdf
+  // NOME DO ARQUIVO: Tipo_Numero_UASG.pdf
   const biddingType = (data.proposal.biddingType || 'Proposta').toUpperCase();
-  const biddingNum = data.client.biddingId || 'S-N';
+  const biddingNum = data.client.biddingId || 'SN';
   const uasg = data.client.uasg || '000000';
   
-  const rawFilename = `${biddingType}_${biddingNum}_UASG-${uasg}`;
-  const finalFilename = sanitizeFilename(rawFilename);
+  const rawFilename = `${biddingType}_${biddingNum}_UASG_${uasg}`;
+  const finalFilename = `${sanitizeFilename(rawFilename)}.pdf`;
 
-  doc.save(`${finalFilename}.pdf`);
+  const blob = doc.output('blob');
+  forceDownload(blob, finalFilename);
 };
