@@ -10,6 +10,16 @@ const escapeCSV = (field: any): string => {
     return str;
 };
 
+// Função para sanitizar nomes de arquivos para dispositivos móveis
+const sanitizeFilename = (name: string): string => {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/[/\\?%*:|"<>]/g, '-')  // Remove caracteres proibidos em sistemas de arquivos
+    .replace(/\s+/g, '_')           // Substitui espaços por underline
+    .replace(/[^\w.-]/g, '');       // Remove qualquer outro caractere especial
+};
+
 export const exportToCSV = (headers: string[], data: any[][], filename: string): void => {
     try {
         const csvContent = [
@@ -21,7 +31,8 @@ export const exportToCSV = (headers: string[], data: any[][], filename: string):
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${filename}.csv`;
+        const safeName = sanitizeFilename(filename);
+        a.download = `${safeName}.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -43,7 +54,8 @@ export const exportToPDF = (headers: string[], data: any[][], filename: string, 
             theme: 'grid',
             headStyles: { fillColor: [202, 138, 4], textColor: [255, 255, 255] },
         });
-        doc.save(`${filename}.pdf`);
+        const safeName = sanitizeFilename(filename);
+        doc.save(`${safeName}.pdf`);
     } catch (error) {
         console.error("Erro ao exportar para PDF:", error);
     }
@@ -151,7 +163,8 @@ export const exportProposalPDF = (data: {
   doc.text(`UASG: ${data.client.uasg}`, pageWidth / 2, 66, { align: 'center' });
   
   doc.setFillColor(amareloOficina[0], amareloOficina[1], amareloOficina[2]);
-  const processText = `Proposta Comercial – Processo nº ${data.client.biddingId}`;
+  // Alterado "nº" para "N." para evitar problemas de caracteres em alguns celulares
+  const processText = `Proposta Comercial - Processo N. ${data.client.biddingId}`;
   const processWidth = doc.getTextWidth(processText) + 10;
   doc.rect((pageWidth - processWidth) / 2, 69, processWidth, 6, 'F');
   doc.setTextColor(255);
@@ -177,14 +190,14 @@ export const exportProposalPDF = (data: {
     body: tableData,
     theme: 'grid',
     headStyles: { fillColor: pretoOficina, textColor: [255, 255, 255], fontSize: 7.5, halign: 'center' },
-    styles: { fontSize: 6.5, cellPadding: 2, textColor: [0, 0, 0], halign: 'center' },
+    styles: { fontSize: 6.5, cellPadding: 2, textColor: [0, 0, 0], halign: 'center', overflow: 'linebreak' },
     columnStyles: { 
       0: { cellWidth: 10 }, 
       1: { cellWidth: 'auto', halign: 'left' }, 
       4: { cellWidth: 15 },
       5: { cellWidth: 12 },
-      6: { cellWidth: 28, noWrap: true },
-      7: { cellWidth: 32, fontStyle: 'bold', noWrap: true }
+      6: { cellWidth: 28 },
+      7: { cellWidth: 32, fontStyle: 'bold' }
     }
   });
 
@@ -196,7 +209,7 @@ export const exportProposalPDF = (data: {
   const totalY = finalY + 12;
   doc.text(`Valor total: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (${valorPorExtenso(total)})`, margin, totalY);
 
-  // SEÇÃO DE ASSINATURA (Logo abaixo do valor total)
+  // SEÇÃO DE ASSINATURA
   const signatureY = totalY + 25; 
 
   if (data.digitalCert) {
@@ -204,7 +217,7 @@ export const exportProposalPDF = (data: {
     const boxX = (pageWidth - boxW) / 2;
     const blockY = signatureY - 10; 
     
-    // 1. Símbolo Squiggle
+    // 1. Símbolo
     doc.setDrawColor(240, 189, 189);
     doc.setLineWidth(0.8);
     doc.lines([
@@ -234,7 +247,7 @@ export const exportProposalPDF = (data: {
     doc.setFont('helvetica', 'normal');
     doc.text(`Dados: ${new Date().toLocaleString('pt-BR')} -03'00'`, techX, blockY + 11);
 
-    // 3. Nome e CPF Centralizados (Embaixo)
+    // 3. Nome e CPF
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(0);
@@ -261,5 +274,13 @@ export const exportProposalPDF = (data: {
     doc.text(`CPF: ${data.company.cpf}`, pageWidth / 2, signatureY + 11, { align: 'center' });
   }
 
-  doc.save(`Proposta_${data.client.biddingId.replace(/\//g, '-')}.pdf`);
+  // NOVA LÓGICA DE NOME DE ARQUIVO: Tipo_Numero_UASG.pdf
+  const biddingType = (data.proposal.biddingType || 'Proposta').toUpperCase();
+  const biddingNum = data.client.biddingId || 'S-N';
+  const uasg = data.client.uasg || '000000';
+  
+  const rawFilename = `${biddingType}_${biddingNum}_UASG-${uasg}`;
+  const finalFilename = sanitizeFilename(rawFilename);
+
+  doc.save(`${finalFilename}.pdf`);
 };
