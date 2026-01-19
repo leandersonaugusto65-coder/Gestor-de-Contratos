@@ -125,7 +125,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 {React.cloneElement(icon, { className: 'w-6 h-6 sm:w-8 sm:h-8' })}
             </div>
             
-            <span className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-colors duration-300 ${
+            <span className={`text-[8px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-colors duration-300 ${
                 isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-300'
             }`}>
                 {label}
@@ -139,8 +139,8 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             <div className="grid grid-cols-5 gap-2 sm:gap-4">
                 <NavButton label="Geral" icon={<BanknotesIcon />} isActive={activeView === 'finance'} onClick={() => setActiveView('finance')} />
                 <NavButton label="Contratos" icon={<DocumentDuplicateIcon />} isActive={activeView === 'contracts'} onClick={() => setActiveView('contracts')} />
-                <NavButton label="Fornec." icon={<ClipboardDocumentListIcon />} isActive={activeView === 'commitments'} onClick={() => setActiveView('commitments')} />
-                <NavButton label="Pagtos." icon={<ClipboardDocumentCheckIcon />} isActive={activeView === 'invoices'} onClick={() => setActiveView('invoices')} />
+                <NavButton label="Fornecimento" icon={<ClipboardDocumentListIcon />} isActive={activeView === 'commitments'} onClick={() => setActiveView('commitments')} />
+                <NavButton label="Pagamentos" icon={<ClipboardDocumentCheckIcon />} isActive={activeView === 'invoices'} onClick={() => setActiveView('invoices')} />
                 <NavButton label="Proposta" icon={<WrenchScrewdriverIcon />} isActive={activeView === 'proposal'} onClick={() => setActiveView('proposal')} />
             </div>
 
