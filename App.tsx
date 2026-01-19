@@ -30,6 +30,7 @@ export default function App() {
 
   // Data State from Supabase
   const [clients, setClients] = useState<Client[] | null>(null);
+  const [storedCert, setStoredCert] = useState<string | null>(null); // Estado para o certificado na nuvem
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSavingData, setIsSavingData] = useState(false);
   const [errorLoading, setErrorLoading] = useState<string | null>(null);
@@ -72,11 +73,11 @@ export default function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, currentSession) => {
-        // Só atualiza o estado se o ID do usuário mudar, prevenindo refreshes de token de resetarem a UI
         setSession(prev => (prev?.user.id === currentSession?.user.id ? prev : currentSession));
         if (!currentSession) {
           setProfile(null);
           setClients(null);
+          setStoredCert(null);
         }
       }
     );
@@ -113,7 +114,6 @@ export default function App() {
     if (!session?.user.id || !profile?.is_approved) return;
 
     const fetchData = async () => {
-      // Se já temos dados, não mostramos o spinner global para não resetar a UI aberta
       if (!clients) setIsLoadingData(true);
       
       setErrorLoading(null);
@@ -126,9 +126,17 @@ export default function App() {
       if (error && error.code !== 'PGRST116') {
         setErrorLoading(error.message);
       } else if (data && data.data) {
-        setClients(data.data);
+        // Suporte a migração de dados: se for array é o formato antigo, se objeto é o novo
+        if (Array.isArray(data.data)) {
+          setClients(data.data);
+          setStoredCert(null);
+        } else {
+          setClients(data.data.clients || []);
+          setStoredCert(data.data.certificate || null);
+        }
       } else {
         setClients(initialClientsData);
+        setStoredCert(null);
       }
       setIsLoadingData(false);
     };
@@ -137,9 +145,10 @@ export default function App() {
   }, [session?.user.id, profile?.is_approved]);
 
   const debouncedClients = useDebounce(clients, 1500);
+  const debouncedCert = useDebounce(storedCert, 1500);
   const isReadOnly = profile?.role === 'user';
 
-  // Save data
+  // Save data (Auto-sync to Cloud)
   useEffect(() => {
     if (debouncedClients === null || isLoadingData || !session || !profile?.is_approved || isReadOnly) {
       return;
@@ -147,34 +156,47 @@ export default function App() {
 
     const saveData = async () => {
       setIsSavingData(true);
-      await supabase.from('app_data').upsert({ id: 1, data: debouncedClients });
+      // Salva em formato de objeto para suportar múltiplos campos na nuvem
+      await supabase.from('app_data').upsert({ 
+        id: 1, 
+        data: { 
+          clients: debouncedClients, 
+          certificate: storedCert 
+        } 
+      });
       setIsSavingData(false);
     };
 
     saveData();
-  }, [debouncedClients, isLoadingData, session, profile, isReadOnly]);
+  }, [debouncedClients, debouncedCert, isLoadingData, session, profile, isReadOnly]);
 
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
-      localStorage.clear();
-      sessionStorage.clear();
       setSession(null);
       setProfile(null);
       setClients(null);
+      setStoredCert(null);
       setSelectedClientId(null);
-      window.location.href = window.location.origin;
     } catch (e) {
       console.error("Logout error:", e);
-      localStorage.clear();
-      window.location.reload();
+      setSession(null);
+      setProfile(null);
+    }
+  };
+
+  const handleSaveCert = (base64: string | null) => {
+    setStoredCert(base64);
+    if (base64) {
+      setNotification({ message: 'Certificado salvo na nuvem!', type: 'success' });
+    } else {
+      setNotification({ message: 'Certificado removido da nuvem.', type: 'success' });
     }
   };
 
   const handleAddContract = ({ clientName, address, cep, clientId, contractData, items }: any) => {
     if (!clients) return;
     
-    // Preparar os itens se vierem da extração
     const finalItems: ContractItem[] = (items || []).map((item: any, index: number) => ({
       ...item,
       id: Date.now() + index
@@ -363,7 +385,7 @@ export default function App() {
 
   const handleBackup = () => {
     if (!clients) return;
-    const dataStr = JSON.stringify(clients, null, 2);
+    const dataStr = JSON.stringify({ clients, certificate: storedCert }, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
@@ -380,6 +402,10 @@ export default function App() {
           const parsedData = JSON.parse(e.target?.result as string);
           if (Array.isArray(parsedData)) {
             setBackupDataToRestore(parsedData);
+            setIsRestoreConfirmOpen(true);
+          } else if (parsedData.clients) {
+            setBackupDataToRestore(parsedData.clients);
+            setStoredCert(parsedData.certificate || null);
             setIsRestoreConfirmOpen(true);
           }
         } catch (error) {
@@ -465,7 +491,7 @@ export default function App() {
     <div className="min-h-screen flex flex-col justify-center items-center bg-gray-900 text-white p-4 text-center">
         <HourglassIcon className="w-12 h-12 text-yellow-500 mb-4" />
         <h1 className="text-xl font-bold mb-2">Sessão expirada ou erro de perfil</h1>
-        <button onClick={handleLogout} className="mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Sair e Resetar App</button>
+        <button onClick={handleLogout} className="mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Sair</button>
     </div>
   );
 
@@ -477,7 +503,6 @@ export default function App() {
     </div>
   );
 
-  // Só mostra o Spinner se os clientes ainda forem nulos (primeiro carregamento)
   if (isLoadingData && clients === null) return <div className="min-h-screen flex justify-center items-center bg-gray-900"><SpinnerIcon className="w-10 h-10 text-yellow-500 animate-spin" /></div>;
   
   return (
@@ -523,7 +548,26 @@ export default function App() {
                 </button>
               )}
             </div>
-            <Dashboard clients={clients || []} contracts={dashboardContracts} commitments={dashboardCommitments} invoices={dashboardInvoices} onSelectClient={setSelectedClientId} globalSummary={globalSummary} filterYear={filterYear} setFilterYear={setFilterYear} filterMonth={filterMonth} setFilterMonth={setFilterMonth} availableYears={availableYears} onMarkInvoiceAsPaid={handleMarkInvoiceAsPaid} onMarkInvoiceAsUnpaid={handleMarkInvoiceAsUnpaid} onDeleteCommitment={handleDeleteCommitment} onDeleteInvoice={handleDeleteInvoice} isReadOnly={isReadOnly} />
+            <Dashboard 
+                clients={clients || []} 
+                contracts={dashboardContracts} 
+                commitments={dashboardCommitments} 
+                invoices={dashboardInvoices} 
+                onSelectClient={setSelectedClientId} 
+                globalSummary={globalSummary} 
+                filterYear={filterYear} 
+                setFilterYear={setFilterYear} 
+                filterMonth={filterMonth} 
+                setFilterMonth={setFilterMonth} 
+                availableYears={availableYears} 
+                onMarkInvoiceAsPaid={handleMarkInvoiceAsPaid} 
+                onMarkInvoiceAsUnpaid={handleMarkInvoiceAsUnpaid} 
+                onDeleteCommitment={handleDeleteCommitment} 
+                onDeleteInvoice={handleDeleteInvoice} 
+                isReadOnly={isReadOnly}
+                storedCert={storedCert}
+                onSaveCert={handleSaveCert}
+            />
           </div>
         )}
       </main>

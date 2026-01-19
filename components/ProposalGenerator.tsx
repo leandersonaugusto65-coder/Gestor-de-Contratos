@@ -14,6 +14,8 @@ import { TrashIcon } from './icons/TrashIcon';
 
 interface ProposalGeneratorProps {
   clients: Client[];
+  storedCert: string | null;
+  onSaveCert: (base64: string | null) => void;
 }
 
 interface DigitalCertInfo {
@@ -23,9 +25,7 @@ interface DigitalCertInfo {
   issuer: string;
 }
 
-const STORAGE_KEY = 'oda_permanent_cert_pfx';
-
-export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients }) => {
+export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients, storedCert, onSaveCert }) => {
   const [isExtracting, setIsExtracting] = useState(false);
   const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
@@ -36,8 +36,7 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
   const [certInfo, setCertInfo] = useState<DigitalCertInfo | null>(null);
   const [isProcessingCert, setIsProcessingCert] = useState(false);
   const [signatureType, setSignatureType] = useState<'manual' | 'digital'>('manual');
-  const [saveCertPermanently, setSaveCertPermanently] = useState(true); // Padrão como true
-  const [hasStoredCert, setHasStoredCert] = useState(false);
+  const [saveToCloud, setSaveToCloud] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const signatureInputRef = useRef<HTMLInputElement>(null);
@@ -66,14 +65,12 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
     role: 'PROPRIETÁRIA'
   };
 
-  // Carregar certificado salvo ao iniciar
+  // Se já houver certificado na nuvem, muda o tipo de assinatura automaticamente
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setHasStoredCert(true);
+    if (storedCert) {
       setSignatureType('digital');
     }
-  }, []);
+  }, [storedCert]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -146,17 +143,15 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
     try {
       let pfxArrayBuffer: ArrayBuffer;
 
-      // Prioridade 1: Usar certificado já salvo no localStorage
-      const savedCertBase64 = localStorage.getItem(STORAGE_KEY);
-      
-      if (savedCertBase64 && !certFile) {
-        const binaryStr = atob(savedCertBase64);
+      // 1. Prioridade: Usar o certificado que já está salvo no Supabase (NUVEM)
+      if (storedCert && !certFile) {
+        const binaryStr = atob(storedCert);
         const len = binaryStr.length;
         const bytes = new Uint8Array(len);
         for (let i = 0; i < len; i++) bytes[i] = binaryStr.charCodeAt(i);
         pfxArrayBuffer = bytes.buffer;
       } 
-      // Prioridade 2: Usar novo arquivo selecionado
+      // 2. Fallback: Usar o novo arquivo que o usuário selecionou agora
       else if (certFile) {
         pfxArrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
           const reader = new FileReader();
@@ -165,7 +160,7 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
           reader.readAsArrayBuffer(certFile);
         });
       } else {
-        throw new Error("Nenhum certificado selecionado ou salvo.");
+        throw new Error("Nenhum certificado disponível.");
       }
 
       // Descriptografar PFX
@@ -185,33 +180,30 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
         issuer: cert.issuer.getField('CN')?.value || 'Desconhecido'
       };
 
-      // Se chegamos aqui, a senha está correta.
       setCertInfo(info);
 
-      // Salvar permanentemente se solicitado
-      if (saveCertPermanently && certFile) {
+      // Se o usuário selecionou um arquivo novo e marcou "Salvar", envia para a nuvem via callback
+      if (saveToCloud && certFile) {
           const reader = new FileReader();
-          reader.readAsDataURL(certFile);
           reader.onload = () => {
               const base64 = (reader.result as string).split(',')[1];
-              localStorage.setItem(STORAGE_KEY, base64);
-              setHasStoredCert(true);
+              onSaveCert(base64);
           };
+          reader.readAsDataURL(certFile);
       }
 
     } catch (err) {
       console.error(err);
-      alert("Senha incorreta ou erro ao ler o certificado. Tente novamente.");
+      alert("Senha incorreta ou erro ao ler o certificado.");
       setCertInfo(null);
     } finally {
       setIsProcessingCert(false);
     }
   };
 
-  const removeStoredCert = () => {
-    if (confirm("Deseja remover o certificado salvo deste navegador? Você precisará selecionar o arquivo novamente na próxima vez.")) {
-      localStorage.removeItem(STORAGE_KEY);
-      setHasStoredCert(false);
+  const removeCloudCert = () => {
+    if (confirm("Deseja remover o certificado salvo na nuvem? Todos os usuários perderão acesso a este arquivo.")) {
+      onSaveCert(null);
       setCertFile(null);
       setCertInfo(null);
       setCertPassword('');
@@ -415,13 +407,13 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
                     <div className="space-y-4">
                         {!certInfo ? (
                             <div className="bg-black border border-gray-800 rounded-3xl p-6 space-y-4">
-                                {hasStoredCert ? (
-                                    <div className="flex justify-between items-center bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
+                                {storedCert ? (
+                                    <div className="flex justify-between items-center bg-yellow-500/10 p-3 rounded-xl border border-yellow-500/20">
                                         <div className="flex items-center gap-2">
-                                            <CheckIcon className="w-4 h-4 text-emerald-500" />
-                                            <span className="text-[10px] font-black text-emerald-500 uppercase">Certificado Instalado</span>
+                                            <CheckIcon className="w-4 h-4 text-yellow-500" />
+                                            <span className="text-[10px] font-black text-yellow-500 uppercase">Certificado Disponível na Nuvem</span>
                                         </div>
-                                        <button onClick={removeStoredCert} className="p-1 text-red-500 hover:bg-red-500/10 rounded-lg transition-all" title="Remover certificado">
+                                        <button onClick={removeCloudCert} className="p-1 text-red-500 hover:bg-red-500/10 rounded-lg transition-all" title="Remover da nuvem">
                                             <TrashIcon className="w-4 h-4" />
                                         </button>
                                     </div>
@@ -432,8 +424,8 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
                                             <input type="file" onChange={e => setCertFile(e.target.files?.[0] || null)} className="w-full text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:bg-gray-800 file:text-white" accept=".pfx,.p12" />
                                         </div>
                                         <div className="flex items-center gap-2 px-1">
-                                            <input type="checkbox" id="save-cert" checked={saveCertPermanently} onChange={e => setSaveCertPermanently(e.target.checked)} className="rounded border-gray-800 bg-black text-yellow-500" />
-                                            <label htmlFor="save-cert" className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer">Salvar neste dispositivo</label>
+                                            <input type="checkbox" id="save-cloud" checked={saveToCloud} onChange={e => setSaveToCloud(e.target.checked)} className="rounded border-gray-800 bg-black text-yellow-500" />
+                                            <label htmlFor="save-cloud" className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer">Salvar na Nuvem (Permanente)</label>
                                         </div>
                                     </>
                                 )}
@@ -441,7 +433,7 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients })
                                     <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block">Senha do Certificado</label>
                                     <input type="password" value={certPassword} onChange={e => setCertPassword(e.target.value)} className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-white text-sm" placeholder="Digite sua senha" />
                                 </div>
-                                <button onClick={processCertificate} disabled={(!certFile && !hasStoredCert) || !certPassword || isProcessingCert} className="w-full bg-yellow-500 hover:bg-yellow-600 disabled:opacity-30 text-black font-black py-3 rounded-xl uppercase text-xs tracking-widest shadow-lg" >
+                                <button onClick={processCertificate} disabled={(!certFile && !storedCert) || !certPassword || isProcessingCert} className="w-full bg-yellow-500 hover:bg-yellow-600 disabled:opacity-30 text-black font-black py-3 rounded-xl uppercase text-xs tracking-widest shadow-lg" >
                                     {isProcessingCert ? 'Autenticando...' : 'Autenticar e Preparar'}
                                 </button>
                             </div>

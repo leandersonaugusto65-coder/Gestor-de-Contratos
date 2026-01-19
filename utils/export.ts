@@ -177,14 +177,14 @@ export const exportProposalPDF = (data: {
     body: tableData,
     theme: 'grid',
     headStyles: { fillColor: pretoOficina, textColor: [255, 255, 255], fontSize: 7.5, halign: 'center' },
-    styles: { fontSize: 6.5, cellPadding: 2, textColor: [0, 0, 0] },
+    styles: { fontSize: 6.5, cellPadding: 2, textColor: [0, 0, 0], halign: 'center' },
     columnStyles: { 
-      0: { cellWidth: 10, halign: 'center' }, 
-      1: { cellWidth: 'auto' }, 
-      4: { cellWidth: 15, halign: 'center' },
-      5: { cellWidth: 12, halign: 'center' },
-      6: { cellWidth: 28, halign: 'right', noWrap: true },
-      7: { cellWidth: 32, fontStyle: 'bold', halign: 'right', noWrap: true }
+      0: { cellWidth: 10 }, 
+      1: { cellWidth: 'auto', halign: 'left' }, 
+      4: { cellWidth: 15 },
+      5: { cellWidth: 12 },
+      6: { cellWidth: 28, noWrap: true },
+      7: { cellWidth: 32, fontStyle: 'bold', noWrap: true }
     }
   });
 

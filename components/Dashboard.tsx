@@ -35,13 +35,15 @@ interface DashboardProps {
     onDeleteCommitment: (clientId: number, contractId: number, commitmentId: number) => void;
     onDeleteInvoice: (clientId: number, contractId: number, invoiceId: number) => void;
     isReadOnly: boolean;
+    storedCert: string | null;
+    onSaveCert: (base64: string | null) => void;
 }
 
 const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const formatDate = (date: string) => new Intl.DateTimeFormat('pt-BR').format(new Date(`${date}T00:00:00`));
 
 export const Dashboard: React.FC<DashboardProps> = (props) => {
-    const { clients, contracts, commitments, invoices, onSelectClient, globalSummary, filterYear, setFilterYear, filterMonth, setFilterMonth, availableYears, onMarkInvoiceAsPaid, onMarkInvoiceAsUnpaid, onDeleteCommitment, onDeleteInvoice, isReadOnly } = props;
+    const { clients, contracts, commitments, invoices, onSelectClient, globalSummary, filterYear, setFilterYear, filterMonth, setFilterMonth, availableYears, onMarkInvoiceAsPaid, onMarkInvoiceAsUnpaid, onDeleteCommitment, onDeleteInvoice, isReadOnly, storedCert, onSaveCert } = props;
     
     const [isReceivablesModalOpen, setIsReceivablesModalOpen] = useState(false);
     const [activeView, setActiveView] = useState<DashboardView>('finance');
@@ -186,7 +188,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                     )}
                     {activeView === 'commitments' && <AllCommitmentsView commitments={pendingCommitments} onSelectCommitment={setSelectedCommitment} />}
                     {activeView === 'invoices' && <AllInvoicesView invoices={pendingInvoices} onSelectInvoice={setSelectedInvoice} />}
-                    {activeView === 'proposal' && <ProposalGenerator clients={clients} />}
+                    {activeView === 'proposal' && <ProposalGenerator clients={clients} storedCert={storedCert} onSaveCert={onSaveCert} />}
                     {activeView === 'contracts' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {contracts.length > 0 ? (
@@ -206,16 +208,6 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
             {isReceivablesModalOpen && <ReceivablesModal clients={clients} onClose={() => setIsReceivablesModalOpen(false)} />}
             {selectedCommitment && <CommitmentDetailModal commitment={selectedCommitment} onClose={() => setSelectedCommitment(null)} onDelete={() => { onDeleteCommitment(selectedCommitment.clientId, selectedCommitment.contractId, selectedCommitment.id); setSelectedCommitment(null); }} isReadOnly={isReadOnly} />}
             {selectedInvoice && <InvoiceDetailModal invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} onMarkAsPaid={() => onMarkInvoiceAsPaid(selectedInvoice.clientId, selectedInvoice.contractId, selectedInvoice.id)} onMarkAsUnpaid={() => onMarkInvoiceAsUnpaid(selectedInvoice.clientId, selectedInvoice.contractId, selectedInvoice.id)} onDelete={() => { onDeleteInvoice(selectedInvoice.clientId, selectedInvoice.contractId, selectedInvoice.id); setSelectedInvoice(null); }} isReadOnly={isReadOnly} />}
-            
-            <style>{`
-                @keyframes fade-in {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .animate-fade-in {
-                    animation: fade-in 0.4s ease-out forwards;
-                }
-            `}</style>
         </div>
     );
 };
