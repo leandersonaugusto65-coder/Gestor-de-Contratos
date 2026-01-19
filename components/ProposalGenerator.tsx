@@ -25,6 +25,7 @@ interface DigitalCertInfo {
 export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients, storedCert, onSaveCert }) => {
   const [isExtracting, setIsExtracting] = useState(false);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [keepAccents, setKeepAccents] = useState(false);
   
   const [certFile, setCertFile] = useState<File | null>(null);
   const [certPassword, setCertPassword] = useState('');
@@ -325,6 +326,18 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients, s
             </div>
 
             <div className="w-full lg:w-1/2 flex flex-col justify-center">
+                 <div className="flex items-center justify-center gap-3 mb-4">
+                    <input 
+                        type="checkbox" 
+                        id="keepAccents" 
+                        checked={keepAccents} 
+                        onChange={(e) => setKeepAccents(e.target.checked)}
+                        className="w-5 h-5 rounded border-gray-600 bg-gray-900 text-yellow-600 focus:ring-yellow-500 cursor-pointer"
+                    />
+                    <label htmlFor="keepAccents" className="text-sm text-gray-400 cursor-pointer">
+                        Manter acentuação <span className="text-gray-500 italic">(pode causar erros no PDF)</span>
+                    </label>
+                </div>
                 <button 
                     onClick={() => exportProposalPDF({
                         company: companyInfo,
@@ -332,7 +345,8 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients, s
                         proposal: proposalData,
                         items: selectedItemsList,
                         signature: null,
-                        digitalCert: certInfo
+                        digitalCert: certInfo,
+                        keepAccents: keepAccents
                     })}
                     disabled={!proposalData.clientName || selectedItemsList.length === 0}
                     className="w-full bg-yellow-500 hover:bg-yellow-600 disabled:opacity-20 text-black font-black py-10 rounded-[2.5rem] shadow-[0_15px_40px_rgba(234,179,8,0.25)] transition-all active:scale-[0.98] flex flex-col items-center gap-4"

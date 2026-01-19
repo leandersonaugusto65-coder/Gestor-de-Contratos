@@ -143,7 +143,7 @@ export const valorPorExtenso = (valor: number): string => {
   }
   if (centavos > 0) partes.push(converterParte(centavos) + (centavos === 1 ? ' centavo' : ' centavos'));
   const final = partes.join(' e ');
-  return safeText(final.charAt(0).toUpperCase() + final.slice(1));
+  return final.charAt(0).toUpperCase() + final.slice(1);
 };
 
 export const exportProposalPDF = (data: {
@@ -152,8 +152,16 @@ export const exportProposalPDF = (data: {
   proposal: any,
   items: any[],
   signature: string | null,
-  digitalCert?: any
+  digitalCert?: any,
+  keepAccents?: boolean
 }): void => {
+  const text = (str: string | number | undefined | null): string => {
+    if (data.keepAccents) {
+      return String(str ?? '');
+    }
+    return safeText(str);
+  }
+
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const margin = 20;
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -169,31 +177,31 @@ export const exportProposalPDF = (data: {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
   doc.setTextColor(0);
-  doc.text(safeText(data.company.name), margin, 20);
+  doc.text(text(data.company.name), margin, 20);
   
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(80);
-  const splitAddress = doc.splitTextToSize(safeText(data.company.address), pageWidth - (margin * 2));
+  const splitAddress = doc.splitTextToSize(text(data.company.address), pageWidth - (margin * 2));
   doc.text(splitAddress, margin, 25);
   
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0);
-  doc.text(`CNPJ: ${safeText(data.company.cnpj)} | IE: ${safeText(data.company.ie)}`, margin, 35);
-  doc.text(`Fone: ${safeText(data.company.phone)} | Email: ${safeText(data.company.email)}`, margin, 39);
+  doc.text(`CNPJ: ${text(data.company.cnpj)} | IE: ${text(data.company.ie)}`, margin, 35);
+  doc.text(`Fone: ${text(data.company.phone)} | Email: ${text(data.company.email)}`, margin, 39);
 
   doc.setDrawColor(200);
   doc.line(margin, 43, pageWidth - margin, 43);
 
   // Titulo Proposta
-  const clientUpper = safeText(data.client.name).toUpperCase();
+  const clientUpper = text(data.client.name).toUpperCase();
   doc.setFontSize(12);
   doc.text(clientUpper, pageWidth / 2, 55, { align: 'center' });
   doc.setFontSize(10);
-  doc.text(`UASG: ${safeText(data.client.uasg)}`, pageWidth / 2, 61, { align: 'center' });
+  doc.text(`UASG: ${text(data.client.uasg)}`, pageWidth / 2, 61, { align: 'center' });
   
   doc.setFillColor(amareloOficina[0], amareloOficina[1], amareloOficina[2]);
-  const processText = `Proposta Comercial - Processo N. ${safeText(data.client.biddingId)}`;
+  const processText = `Proposta Comercial - Processo N. ${text(data.client.biddingId)}`;
   const processWidth = doc.getTextWidth(processText) + 10;
   doc.rect((pageWidth - processWidth) / 2, 64, processWidth, 7, 'F');
   doc.setTextColor(255);
@@ -209,7 +217,7 @@ export const exportProposalPDF = (data: {
   currentY += 8;
 
   doc.setFontSize(10);
-  const introText = `A Oficina da Arte, inscrita sob o CNPJ n 27.454.615/0001-44, declara seu pleno interesse em fornecer os materiais referentes ao processo n ${safeText(data.client.biddingId)}, submetendo-se integralmente as condicoes e exigencias estabelecidas no edital.`;
+  const introText = `A Oficina da Arte, inscrita sob o CNPJ n 27.454.615/0001-44, declara seu pleno interesse em fornecer os materiais referentes ao processo n ${text(data.client.biddingId)}, submetendo-se integralmente as condicoes e exigencias estabelecidas no edital.`;
   const splitIntro = doc.splitTextToSize(introText, pageWidth - (margin * 2));
   doc.text(splitIntro, margin, currentY);
   currentY += (splitIntro.length * 5) + 2;
@@ -221,11 +229,11 @@ export const exportProposalPDF = (data: {
 
   // Tabela de Itens
   const tableData = data.items.map(item => [
-    safeText(item.item),
-    safeText(item.description).toUpperCase(),
+    text(item.item),
+    text(item.description).toUpperCase(),
     '2026',
     'ODA',
-    safeText(item.quantityBid),
+    text(item.quantityBid),
     'UNID.',
     item.unitValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
     (item.unitValue * item.quantityBid).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -255,16 +263,16 @@ export const exportProposalPDF = (data: {
   doc.setTextColor(0);
   const totalY = finalY + 10;
   const extenso = valorPorExtenso(total);
-  doc.text(`Valor total: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (${safeText(extenso)})`, margin, totalY);
+  doc.text(`Valor total: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (${text(extenso)})`, margin, totalY);
 
   // Condições Gerais
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   const infoY = totalY + 10;
-  doc.text(`Prazo de Entrega: ${safeText(data.proposal.delivery)}`, margin, infoY);
-  doc.text(`Validade da Proposta: ${safeText(data.proposal.validity)}`, margin, infoY + 4);
-  doc.text(`Pagamento: ${safeText(data.proposal.payment)}`, margin, infoY + 8);
-  doc.text(`Dados Bancarios: ${safeText(data.proposal.bankInfo)}`, margin, infoY + 12);
+  doc.text(`Prazo de Entrega: ${text(data.proposal.delivery)}`, margin, infoY);
+  doc.text(`Validade da Proposta: ${text(data.proposal.validity)}`, margin, infoY + 4);
+  doc.text(`Pagamento: ${text(data.proposal.payment)}`, margin, infoY + 8);
+  doc.text(`Dados Bancarios: ${text(data.proposal.bankInfo)}`, margin, infoY + 12);
 
   // --- SEÇÃO DE ASSINATURA PADRÃO ADOBE (IMAGEM 2) ---
   const signatureStartY = infoY + 30;
@@ -290,7 +298,7 @@ export const exportProposalPDF = (data: {
     doc.setFont('helvetica', 'bold');
     
     // Split text to fit left half
-    const signerName = safeText(data.digitalCert.subject);
+    const signerName = text(data.digitalCert.subject);
     const leftText = doc.splitTextToSize(signerName, (boxWidth / 2) - 5);
     doc.text(leftText, boxX + 3, signatureStartY + 8);
 
@@ -328,12 +336,12 @@ export const exportProposalPDF = (data: {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(0);
-    doc.text(safeText(data.company.owner), pageWidth / 2, detailY, { align: 'center' });
+    doc.text(text(data.company.owner), pageWidth / 2, detailY, { align: 'center' });
     
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    doc.text(safeText(data.company.role), pageWidth / 2, detailY + 5, { align: 'center' });
-    doc.text(`CPF: ${safeText(data.company.cpf)}`, pageWidth / 2, detailY + 9, { align: 'center' });
+    doc.text(text(data.company.role), pageWidth / 2, detailY + 5, { align: 'center' });
+    doc.text(`CPF: ${text(data.company.cpf)}`, pageWidth / 2, detailY + 9, { align: 'center' });
 
   } else {
     // Assinatura Manual Padrão
@@ -346,12 +354,12 @@ export const exportProposalPDF = (data: {
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.text(safeText(data.company.owner), pageWidth / 2, signatureStartY + 11, { align: 'center' });
+    doc.text(text(data.company.owner), pageWidth / 2, signatureStartY + 11, { align: 'center' });
     
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    doc.text(safeText(data.company.role), pageWidth / 2, signatureStartY + 16, { align: 'center' });
-    doc.text(`CPF: ${safeText(data.company.cpf)}`, pageWidth / 2, signatureStartY + 20, { align: 'center' });
+    doc.text(text(data.company.role), pageWidth / 2, signatureStartY + 16, { align: 'center' });
+    doc.text(`CPF: ${text(data.company.cpf)}`, pageWidth / 2, signatureStartY + 20, { align: 'center' });
   }
 
   // Nome do Arquivo TIPO_NUMERO_UASG.pdf
