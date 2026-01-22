@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { Commitment, ContractItem, Invoice } from '../types';
 import { ClipboardDocumentListIcon } from './icons/ClipboardDocumentListIcon';
@@ -81,7 +82,7 @@ export const CommitmentCard: React.FC<CommitmentCardProps> = ({ commitment, cont
                           return (
                               <tr key={item.contractItemId} className="hover:bg-yellow-600/5 transition-colors">
                                   <td className="px-4 py-3 text-center font-bold text-gray-500">{contractItem.item}</td>
-                                  <td className="px-4 py-3 max-w-xs truncate font-medium">{contractItem.description}</td>
+                                  <td className="px-4 py-3 whitespace-normal break-words font-medium">{contractItem.description}</td>
                                   <td className="px-4 py-3 text-center font-mono font-bold text-gray-400">{item.quantity}</td>
                                   <td className="px-4 py-3 text-right font-mono font-bold text-yellow-500">{formatCurrency(totalValue)}</td>
                                   <td className={`px-4 py-3 text-center font-black ${balanceToSupply > 0 ? 'text-orange-500' : 'text-emerald-500'}`}>{balanceToSupply}</td>
@@ -107,7 +108,7 @@ export const CommitmentCard: React.FC<CommitmentCardProps> = ({ commitment, cont
                       {balanceToSupply} a entregar
                     </span>
                   </div>
-                  <p className="text-xs font-semibold text-gray-200 line-clamp-2 leading-relaxed">{contractItem.description}</p>
+                  <p className="text-xs font-semibold text-gray-200 leading-relaxed">{contractItem.description}</p>
                   <div className="flex justify-between items-end pt-1">
                     <p className="text-[10px] text-gray-500 uppercase font-bold">Qtd: <span className="text-gray-300">{item.quantity}</span></p>
                     <p className="text-sm font-black text-yellow-500 font-mono">{formatCurrency(totalValue)}</p>

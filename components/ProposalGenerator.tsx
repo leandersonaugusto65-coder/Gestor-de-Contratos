@@ -247,47 +247,86 @@ export const ProposalGenerator: React.FC<ProposalGeneratorProps> = ({ clients, s
         {/* TABELA DE ITENS EDITÁVEL */}
         <section className="space-y-6 pt-6 border-t border-gray-800/50">
             <h3 className="text-[11px] font-black text-yellow-600 uppercase tracking-[0.2em]">Itens Selecionados</h3>
-            <div className="overflow-hidden rounded-3xl border border-gray-800 bg-black/20">
-                <table className="w-full text-left">
-                    <thead className="bg-black text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-800">
-                        <tr>
-                            <th className="px-6 py-5 w-16 text-center">SEL.</th>
-                            <th className="px-6 py-5 w-20 text-center">ITEM</th>
-                            <th className="px-6 py-5">DESCRIÇÃO (EDITÁVEL)</th>
-                            <th className="px-6 py-5 w-28 text-center">QTD.</th>
-                            <th className="px-6 py-5 w-44 text-right">VALOR UNIT.</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800">
-                        {items.length > 0 ? items.map((item, idx) => (
-                            <tr key={idx} className={`group hover:bg-yellow-500/5 transition-colors ${!selectedIndices.has(idx) ? 'opacity-30' : ''}`}>
-                                <td className="px-6 py-4 text-center">
-                                    <input type="checkbox" checked={selectedIndices.has(idx)} onChange={() => {
-                                        const next = new Set(selectedIndices);
-                                        if(next.has(idx)) next.delete(idx); else next.add(idx);
-                                        setSelectedIndices(next);
-                                    }} className="w-6 h-6 rounded-lg border-gray-700 bg-gray-900 text-yellow-500 focus:ring-0 cursor-pointer" />
-                                </td>
-                                <td className="px-6 py-4 text-center font-bold text-gray-400">#{item.item}</td>
-                                <td className="px-6 py-4">
-                                    <textarea value={item.description} onChange={e => handleUpdateItem(idx, 'description', e.target.value)} className="w-full bg-transparent text-sm text-gray-200 focus:text-white focus:outline-none resize-none py-1" rows={2} />
-                                </td>
-                                <td className="px-6 py-4">
-                                    <input type="number" value={item.quantityBid} onChange={e => handleUpdateItem(idx, 'quantityBid', Number(e.target.value))} className="w-full bg-transparent text-center font-black text-white focus:outline-none" />
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center justify-end gap-2">
-                                        <span className="text-gray-600 text-xs font-bold">R$</span>
-                                        <input type="number" step="0.01" value={item.unitValue} onChange={e => handleUpdateItem(idx, 'unitValue', parseFloat(e.target.value) || 0)} className="bg-transparent text-right font-mono font-bold text-yellow-500 focus:outline-none w-28" />
-                                    </div>
-                                </td>
+
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-hidden rounded-3xl border border-gray-800 bg-black/20">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left min-w-[700px]">
+                        <thead className="bg-black text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-800">
+                            <tr>
+                                <th className="px-6 py-5 w-16 text-center">SEL.</th>
+                                <th className="px-6 py-5 w-20 text-center">ITEM</th>
+                                <th className="px-6 py-5">DESCRIÇÃO (EDITÁVEL)</th>
+                                <th className="px-6 py-5 w-28 text-center">QTD.</th>
+                                <th className="px-6 py-5 w-44 text-right">VALOR UNIT.</th>
                             </tr>
-                        )) : (
-                            <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-600 italic font-medium">Nenhum item importado. Use o botão acima para carregar o PDF.</td></tr>
-                        )}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-800">
+                            {items.length > 0 ? items.map((item, idx) => (
+                                <tr key={idx} className={`group hover:bg-yellow-500/5 transition-colors ${!selectedIndices.has(idx) ? 'opacity-30' : ''}`}>
+                                    <td className="px-6 py-4 text-center">
+                                        <input type="checkbox" checked={selectedIndices.has(idx)} onChange={() => {
+                                            const next = new Set(selectedIndices);
+                                            if(next.has(idx)) next.delete(idx); else next.add(idx);
+                                            setSelectedIndices(next);
+                                        }} className="w-6 h-6 rounded-lg border-gray-700 bg-gray-900 text-yellow-500 focus:ring-0 cursor-pointer" />
+                                    </td>
+                                    <td className="px-6 py-4 text-center font-bold text-gray-400">#{item.item}</td>
+                                    <td className="px-6 py-4">
+                                        <textarea value={item.description} onChange={e => handleUpdateItem(idx, 'description', e.target.value)} className="w-full bg-transparent text-sm text-gray-200 focus:text-white focus:outline-none resize-none py-1" rows={2} />
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <input type="number" value={item.quantityBid} onChange={e => handleUpdateItem(idx, 'quantityBid', Number(e.target.value))} className="w-full bg-transparent text-center font-black text-white focus:outline-none" />
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <span className="text-gray-600 text-xs font-bold">R$</span>
+                                            <input type="number" step="0.01" value={item.unitValue} onChange={e => handleUpdateItem(idx, 'unitValue', parseFloat(e.target.value) || 0)} className="bg-transparent text-right font-mono font-bold text-yellow-500 focus:outline-none w-28" />
+                                        </div>
+                                    </td>
+                                </tr>
+                            )) : (
+                                <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-600 italic font-medium">Nenhum item importado. Use o botão acima para carregar o PDF.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
+
+            {/* Mobile Cards */}
+            <div className="block md:hidden space-y-4">
+                {items.length > 0 ? items.map((item, idx) => (
+                    <div key={idx} className={`p-4 rounded-2xl border transition-colors ${selectedIndices.has(idx) ? 'bg-yellow-500/5 border-yellow-500/30' : 'bg-gray-800/40 border-gray-700'}`}>
+                        <div className="flex items-start gap-4 mb-4">
+                            <input type="checkbox" checked={selectedIndices.has(idx)} onChange={() => {
+                                const next = new Set(selectedIndices);
+                                if(next.has(idx)) next.delete(idx); else next.add(idx);
+                                setSelectedIndices(next);
+                            }} className="w-6 h-6 rounded-md border-gray-600 bg-gray-900 text-yellow-500 focus:ring-0 cursor-pointer mt-1" />
+                             <div className="flex-grow">
+                                <p className="font-bold text-gray-400">Item #{item.item}</p>
+                                <textarea value={item.description} onChange={e => handleUpdateItem(idx, 'description', e.target.value)} className="w-full bg-transparent text-sm text-gray-200 focus:text-white focus:outline-none resize-none py-1 -ml-1" rows={3} />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block">QTD.</label>
+                                <input type="number" value={item.quantityBid} onChange={e => handleUpdateItem(idx, 'quantityBid', Number(e.target.value))} className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-center font-bold text-white focus:outline-none" />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block">Valor Unit.</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs">R$</span>
+                                    <input type="number" step="0.01" value={item.unitValue} onChange={e => handleUpdateItem(idx, 'unitValue', parseFloat(e.target.value) || 0)} className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-right font-mono font-bold text-yellow-500 focus:outline-none pl-8" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )) : (
+                    <div className="px-6 py-12 text-center text-gray-600 italic font-medium">Nenhum item importado.</div>
+                )}
+            </div>
+
             {totalValue > 0 && (
                 <div className="flex justify-end pt-4">
                     <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl px-8 py-4 text-right">

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { Client, Contract, ContractItem, Commitment, Invoice } from '../types';
 import { ContractCard } from './ContractCard';
@@ -107,7 +108,7 @@ export const ClientDetail: React.FC<ClientDetailProps> = (props) => {
                         )}
                     </div>
                     
-                    <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-sm">
+                    <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
                         <div className="p-4 bg-black/30 rounded-2xl border border-gray-800/50">
                             <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">UASG</p>
                             <p className="text-gray-200 font-mono">{client.uasg}</p>
@@ -116,9 +117,17 @@ export const ClientDetail: React.FC<ClientDetailProps> = (props) => {
                             <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">CNPJ</p>
                             <p className="text-gray-200 font-mono">{client.cnpj || '---'}</p>
                         </div>
-                        <div className="col-span-1 lg:col-span-2 p-4 bg-black/30 rounded-2xl border border-gray-800/50">
+                        <div className="sm:col-span-2 p-4 bg-black/30 rounded-2xl border border-gray-800/50">
                             <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Endereço Principal</p>
-                            <p className="text-gray-200 truncate">{client.address || 'Não informado'} {client.cep ? `| CEP: ${client.cep}` : ''}</p>
+                            <p className="text-gray-200 break-words">{client.address || 'Não informado'}</p>
+                            
+                            {client.cep && (
+                                <>
+                                    <div className="w-full h-px bg-gray-700/50 my-3" />
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">CEP</p>
+                                    <p className="text-gray-200 font-mono">{client.cep}</p>
+                                </>
+                            )}
                         </div>
                     </div>
                  </div>

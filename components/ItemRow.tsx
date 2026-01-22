@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { ContractItem } from '../types';
 import { TrashIcon } from './icons/TrashIcon';
@@ -25,7 +26,7 @@ export const ItemRow: React.FC<ItemRowProps> = ({ item, quantities, onDeleteItem
   return (
     <tr className="bg-gray-800 border-b border-gray-700 hover:bg-gray-700 transition-colors duration-200">
       <td className="px-4 py-3 font-medium text-gray-100 text-center">{item.item}</td>
-      <td className="px-4 py-3 text-gray-300">{item.description}</td>
+      <td className="px-4 py-3 text-gray-300 whitespace-normal break-words min-w-[250px]">{item.description}</td>
       <td className="px-4 py-3 text-right font-mono text-gray-200">{formatCurrency(item.unitValue)}</td>
       <td className="px-4 py-3 text-center font-medium text-gray-200">{item.quantityBid}</td>
       <td className="px-4 py-3 text-center text-gray-400">{quantityCommitted}</td>

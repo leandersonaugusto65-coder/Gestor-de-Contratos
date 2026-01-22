@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { Invoice, ContractItem } from '../types';
 import { ClipboardDocumentCheckIcon } from './icons/ClipboardDocumentCheckIcon';
@@ -125,7 +126,7 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({ invoice, contractItems
                               return (
                                   <tr key={item.contractItemId} className="hover:bg-yellow-600/5 transition-colors">
                                       <td className="px-4 py-3 text-center font-bold text-gray-500">{contractItem.item}</td>
-                                      <td className="px-4 py-3 max-w-xs truncate font-medium">{contractItem.description}</td>
+                                      <td className="px-4 py-3 whitespace-normal break-words font-medium">{contractItem.description}</td>
                                       <td className="px-4 py-3 text-center font-mono font-bold text-gray-400">{item.quantitySupplied}</td>
                                       <td className={`px-4 py-3 text-right font-mono font-bold ${invoice.isPaid ? 'text-emerald-500' : 'text-yellow-500'}`}>{formatCurrency(totalValue)}</td>
                                   </tr>
@@ -143,7 +144,7 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({ invoice, contractItems
                       return (
                           <div key={item.contractItemId} className="p-4 space-y-1">
                               <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Item {contractItem.item}</span>
-                              <p className="text-xs font-semibold text-gray-200 line-clamp-1">{contractItem.description}</p>
+                              <p className="text-xs font-semibold text-gray-200">{contractItem.description}</p>
                               <div className="flex justify-between items-end pt-1">
                                   <p className="text-[10px] text-gray-500 uppercase font-bold">Fornecidos: <span className="text-gray-300">{item.quantitySupplied}</span></p>
                                   <p className={`text-sm font-black font-mono ${invoice.isPaid ? 'text-emerald-500' : 'text-yellow-500'}`}>{formatCurrency(totalValue)}</p>
