@@ -114,3 +114,13 @@ export interface DashboardInvoice extends Invoice {
 }
 
 export type DashboardView = 'finance' | 'contracts' | 'commitments' | 'invoices' | 'proposal' | 'habilitação';
+
+// Tipos para a funcionalidade de Habilitação
+export interface Certidao {
+  issueDate: string | null;
+  expiryDate: string | null;
+  fileData: string | null;
+  fileName: string | null;
+}
+
+export type HabilitacaoData = Record<string, Certidao>;

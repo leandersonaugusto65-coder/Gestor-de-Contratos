@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import type { Client, Contract, ContractItem, Commitment, Invoice, DashboardContract, DashboardCommitment, DashboardInvoice, GlobalSummaryData, Profile } from './types';
+import type { Client, Contract, ContractItem, Commitment, Invoice, DashboardContract, DashboardCommitment, DashboardInvoice, GlobalSummaryData, Profile, HabilitacaoData } from './types';
 import { initialClientsData } from './data/initialData';
 import { Dashboard } from './components/Dashboard';
 import { ClientDetail } from './components/ClientDetail';
@@ -30,7 +30,8 @@ export default function App() {
 
   // Data State from Supabase
   const [clients, setClients] = useState<Client[] | null>(null);
-  const [storedCert, setStoredCert] = useState<string | null>(null); // Estado para o certificado na nuvem
+  const [storedCert, setStoredCert] = useState<string | null>(null);
+  const [habilitacaoData, setHabilitacaoData] = useState<HabilitacaoData | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSavingData, setIsSavingData] = useState(false);
   const [errorLoading, setErrorLoading] = useState<string | null>(null);
@@ -40,7 +41,7 @@ export default function App() {
   const [isAddingContract, setIsAddingContract] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
-  const [backupDataToRestore, setBackupDataToRestore] = useState<Client[] | null>(null);
+  const [backupDataToRestore, setBackupDataToRestore] = useState<any | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Filtering State
@@ -78,6 +79,7 @@ export default function App() {
           setProfile(null);
           setClients(null);
           setStoredCert(null);
+          setHabilitacaoData(null);
         }
       }
     );
@@ -126,17 +128,19 @@ export default function App() {
       if (error && error.code !== 'PGRST116') {
         setErrorLoading(error.message);
       } else if (data && data.data) {
-        // Suporte a migração de dados: se for array é o formato antigo, se objeto é o novo
-        if (Array.isArray(data.data)) {
+        if (Array.isArray(data.data)) { // old format
           setClients(data.data);
           setStoredCert(null);
-        } else {
+          setHabilitacaoData({});
+        } else { // new object format
           setClients(data.data.clients || []);
           setStoredCert(data.data.certificate || null);
+          setHabilitacaoData(data.data.habilitacao || {});
         }
       } else {
         setClients(initialClientsData);
         setStoredCert(null);
+        setHabilitacaoData({});
       }
       setIsLoadingData(false);
     };
@@ -146,6 +150,7 @@ export default function App() {
 
   const debouncedClients = useDebounce(clients, 1500);
   const debouncedCert = useDebounce(storedCert, 1500);
+  const debouncedHabilitacao = useDebounce(habilitacaoData, 1500);
   const isReadOnly = profile?.role === 'user';
 
   // Save data (Auto-sync to Cloud)
@@ -156,19 +161,19 @@ export default function App() {
 
     const saveData = async () => {
       setIsSavingData(true);
-      // Salva em formato de objeto para suportar múltiplos campos na nuvem
       await supabase.from('app_data').upsert({ 
         id: 1, 
         data: { 
           clients: debouncedClients, 
-          certificate: storedCert 
+          certificate: debouncedCert,
+          habilitacao: debouncedHabilitacao,
         } 
       });
       setIsSavingData(false);
     };
 
     saveData();
-  }, [debouncedClients, debouncedCert, isLoadingData, session, profile, isReadOnly]);
+  }, [debouncedClients, debouncedCert, debouncedHabilitacao, isLoadingData, session, profile, isReadOnly]);
 
   const handleLogout = async () => {
     try {
@@ -177,6 +182,7 @@ export default function App() {
       setProfile(null);
       setClients(null);
       setStoredCert(null);
+      setHabilitacaoData(null);
       setSelectedClientId(null);
     } catch (e) {
       console.error("Logout error:", e);
@@ -192,6 +198,10 @@ export default function App() {
     } else {
       setNotification({ message: 'Certificado removido da nuvem.', type: 'success' });
     }
+  };
+
+  const handleUpdateHabilitacaoData = (newData: HabilitacaoData) => {
+    setHabilitacaoData(newData);
   };
 
   const handleAddContract = ({ clientName, address, cep, clientId, contractData, items }: any) => {
@@ -385,7 +395,7 @@ export default function App() {
 
   const handleBackup = () => {
     if (!clients) return;
-    const dataStr = JSON.stringify({ clients, certificate: storedCert }, null, 2);
+    const dataStr = JSON.stringify({ clients, certificate: storedCert, habilitacao: habilitacaoData }, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
@@ -400,14 +410,8 @@ export default function App() {
       reader.onload = (e) => {
         try {
           const parsedData = JSON.parse(e.target?.result as string);
-          if (Array.isArray(parsedData)) {
-            setBackupDataToRestore(parsedData);
-            setIsRestoreConfirmOpen(true);
-          } else if (parsedData.clients) {
-            setBackupDataToRestore(parsedData.clients);
-            setStoredCert(parsedData.certificate || null);
-            setIsRestoreConfirmOpen(true);
-          }
+          setBackupDataToRestore(parsedData);
+          setIsRestoreConfirmOpen(true);
         } catch (error) {
           setNotification({ message: 'Erro ao ler arquivo de backup.', type: 'error' });
         }
@@ -418,7 +422,16 @@ export default function App() {
   };
 
   const handleConfirmRestore = () => {
-    if (backupDataToRestore) setClients(backupDataToRestore);
+    if (!backupDataToRestore) return;
+    if (Array.isArray(backupDataToRestore)) {
+      setClients(backupDataToRestore);
+      setStoredCert(null);
+      setHabilitacaoData({});
+    } else {
+      setClients(backupDataToRestore.clients || []);
+      setStoredCert(backupDataToRestore.certificate || null);
+      setHabilitacaoData(backupDataToRestore.habilitacao || {});
+    }
     setIsRestoreConfirmOpen(false);
     setBackupDataToRestore(null);
   };
@@ -567,6 +580,8 @@ export default function App() {
                 isReadOnly={isReadOnly}
                 storedCert={storedCert}
                 onSaveCert={handleSaveCert}
+                habilitacaoData={habilitacaoData}
+                onUpdateHabilitacaoData={handleUpdateHabilitacaoData}
             />
           </div>
         )}

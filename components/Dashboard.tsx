@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import type { Client, GlobalSummaryData, DashboardContract, DashboardCommitment, DashboardInvoice, DashboardView } from '../types';
+import type { Client, GlobalSummaryData, DashboardContract, DashboardCommitment, DashboardInvoice, DashboardView, HabilitacaoData } from '../types';
 import { GlobalSummary } from './GlobalSummary';
 import { ReceivablesModal } from './ReceivablesModal';
 import { AllCommitmentsView } from './AllCommitmentsView';
@@ -39,13 +39,20 @@ interface DashboardProps {
     isReadOnly: boolean;
     storedCert: string | null;
     onSaveCert: (base64: string | null) => void;
+    habilitacaoData: HabilitacaoData | null;
+    onUpdateHabilitacaoData: (data: HabilitacaoData) => void;
 }
 
 const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const formatDate = (date: string) => new Intl.DateTimeFormat('pt-BR').format(new Date(`${date}T00:00:00`));
 
 export const Dashboard: React.FC<DashboardProps> = (props) => {
-    const { clients, contracts, commitments, invoices, onSelectClient, globalSummary, filterYear, setFilterYear, filterMonth, setFilterMonth, availableYears, onMarkInvoiceAsPaid, onMarkInvoiceAsUnpaid, onDeleteCommitment, onDeleteInvoice, isReadOnly, storedCert, onSaveCert } = props;
+    const { 
+        clients, contracts, commitments, invoices, onSelectClient, globalSummary, 
+        filterYear, setFilterYear, filterMonth, setFilterMonth, availableYears, 
+        onMarkInvoiceAsPaid, onMarkInvoiceAsUnpaid, onDeleteCommitment, onDeleteInvoice, 
+        isReadOnly, storedCert, onSaveCert, habilitacaoData, onUpdateHabilitacaoData 
+    } = props;
     
     const [isReceivablesModalOpen, setIsReceivablesModalOpen] = useState(false);
     const [activeView, setActiveView] = useState<DashboardView>('finance');
@@ -193,7 +200,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                     {activeView === 'commitments' && <AllCommitmentsView commitments={pendingCommitments} onSelectCommitment={setSelectedCommitment} />}
                     {activeView === 'invoices' && <AllInvoicesView invoices={pendingInvoices} onSelectInvoice={setSelectedInvoice} />}
                     {activeView === 'proposal' && <ProposalGenerator clients={clients} storedCert={storedCert} onSaveCert={onSaveCert} />}
-                    {activeView === 'habilitação' && <HabilitacaoView />}
+                    {activeView === 'habilitação' && <HabilitacaoView data={habilitacaoData} onUpdate={onUpdateHabilitacaoData} />}
                     {activeView === 'contracts' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {contracts.length > 0 ? (
