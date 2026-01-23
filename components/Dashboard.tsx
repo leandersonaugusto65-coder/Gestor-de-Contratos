@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import type { Client, GlobalSummaryData, DashboardContract, DashboardCommitment, DashboardInvoice, DashboardView, HabilitacaoData } from '../types';
+import type { Client, GlobalSummaryData, DashboardContract, DashboardCommitment, DashboardInvoice, DashboardView, HabilitacaoData, Certidao } from '../types';
 import { GlobalSummary } from './GlobalSummary';
 import { ReceivablesModal } from './ReceivablesModal';
 import { AllCommitmentsView } from './AllCommitmentsView';
@@ -67,6 +67,20 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     const pendingCommitments = useMemo(() => commitments.filter(c => c.isPending), [commitments]);
     const pendingInvoices = useMemo(() => invoices.filter(inv => !inv.isPaid), [invoices]);
 
+    // Lógica para verificar se há alguma certidão vencida
+    const hasExpiredDocs = useMemo(() => {
+        if (!habilitacaoData) return false;
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+
+        return Object.values(habilitacaoData).some((cert: Certidao) => {
+            if (!cert.expiryDate) return false;
+            const vencimento = new Date(`${cert.expiryDate}T00:00:00`);
+            vencimento.setHours(0, 0, 0, 0);
+            return vencimento.getTime() < hoje.getTime();
+        });
+    }, [habilitacaoData]);
+
     const { exportHeaders, exportData, exportFilename, exportPdfTitle } = useMemo(() => {
         const dateSuffix = `${filterYear !== 'all' ? `_${filterYear}` : ''}${filterMonth !== 'all' ? `_${filterMonth}` : ''}`;
         switch(activeView) {
@@ -119,25 +133,30 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         }
     }, [activeView, contracts, pendingCommitments, pendingInvoices, filterYear, filterMonth, clients]);
 
-    const NavButton: React.FC<{ label: string; icon: any; isActive: boolean; onClick: () => void; }> = ({ label, icon, isActive, onClick }) => (
+    const NavButton: React.FC<{ label: string; icon: any; isActive: boolean; onClick: () => void; isAlert?: boolean }> = ({ label, icon, isActive, onClick, isAlert }) => (
         <button
             onClick={onClick}
             className={`group relative flex flex-col items-center justify-center gap-2 p-3 sm:p-5 text-center transition-all duration-300 rounded-2xl border-2 overflow-hidden ${
                 isActive 
                 ? 'bg-yellow-600/10 border-yellow-500 shadow-[0_0_20px_rgba(202,138,4,0.2)] scale-105 z-10' 
-                : 'bg-gray-900/40 border-gray-800 text-gray-500 hover:border-gray-700 hover:bg-gray-800/60'
+                : isAlert
+                  ? 'bg-red-900/20 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse'
+                  : 'bg-gray-900/40 border-gray-800 text-gray-500 hover:border-gray-700 hover:bg-gray-800/60'
             }`}
         >
             {isActive && <div className="absolute inset-0 bg-gradient-to-br from-yellow-600/20 to-transparent opacity-50" />}
             
-            <div className={`transition-transform duration-300 group-hover:scale-110 ${isActive ? 'text-yellow-500' : 'text-gray-600 group-hover:text-gray-400'}`}>
+            <div className={`transition-transform duration-300 group-hover:scale-110 ${
+                isActive ? 'text-yellow-500' : isAlert ? 'text-red-500' : 'text-gray-600 group-hover:text-gray-400'
+            }`}>
                 {React.cloneElement(icon, { className: 'w-6 h-6 sm:w-8 sm:h-8' })}
             </div>
             
             <span className={`text-[8px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-colors duration-300 ${
-                isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-300'
+                isActive ? 'text-white' : isAlert ? 'text-red-400' : 'text-gray-500 group-hover:text-gray-300'
             }`}>
                 {label}
+                {isAlert && !isActive && <span className="block text-[7px] text-red-500 mt-0.5 font-black">VENCIDO!</span>}
             </span>
             {isActive && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-1 bg-yellow-500 rounded-t-full shadow-[0_-2px_10px_rgba(234,179,8,0.5)]" />}
         </button>
@@ -150,7 +169,13 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 <NavButton label="Contratos" icon={<DocumentDuplicateIcon />} isActive={activeView === 'contracts'} onClick={() => setActiveView('contracts')} />
                 <NavButton label="Fornecimento" icon={<ClipboardDocumentListIcon />} isActive={activeView === 'commitments'} onClick={() => setActiveView('commitments')} />
                 <NavButton label="Pagamentos" icon={<ClipboardDocumentCheckIcon />} isActive={activeView === 'invoices'} onClick={() => setActiveView('invoices')} />
-                <NavButton label="Habilitação" icon={<IdentificationIcon />} isActive={activeView === 'habilitação'} onClick={() => setActiveView('habilitação')} />
+                <NavButton 
+                    label="Habilitação" 
+                    icon={<IdentificationIcon />} 
+                    isActive={activeView === 'habilitação'} 
+                    onClick={() => setActiveView('habilitação')} 
+                    isAlert={hasExpiredDocs} // Ativa o alerta vermelho se houver vencidos
+                />
                 <NavButton label="Proposta" icon={<WrenchScrewdriverIcon />} isActive={activeView === 'proposal'} onClick={() => setActiveView('proposal')} />
             </div>
 
