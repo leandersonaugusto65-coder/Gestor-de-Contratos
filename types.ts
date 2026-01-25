@@ -15,6 +15,17 @@ export interface Profile {
   role: 'admin' | 'editor' | 'user';
 }
 
+export interface GitHubConfig {
+  enabled: boolean;
+  token: string;
+  owner: string;
+  repo: string;
+  path: string;
+  branch: string;
+  lastSync?: string;
+  error?: string | null;
+}
+
 export interface ContractItem {
   id: number;
   item: number;
@@ -117,10 +128,35 @@ export type DashboardView = 'finance' | 'contracts' | 'commitments' | 'invoices'
 
 // Tipos para a funcionalidade de Habilitação
 export interface Certidao {
-  issueDate: string | null;
-  expiryDate: string | null;
-  fileData: string | null;
-  fileName: string | null;
+  issueDate?: string | null;
+  expiryDate?: string | null;
+  fileData?: string | null;
+  fileName?: string | null;
 }
 
-export type HabilitacaoData = Record<string, Certidao>;
+export interface ManagedFile {
+  id: number;
+  fileData: string | null;
+  fileName: string | null;
+  description: string;
+}
+
+export type HabilitacaoData = {
+  certidoes: {
+    estadual: Certidao;
+    federal: Certidao;
+    municipal: Certidao;
+    distrital: Certidao;
+    fgts: Certidao;
+    trabalhista: Certidao;
+    estadualTributaria: Certidao;
+    falencia: Certidao;
+    correcional: Certidao;
+  };
+  contabilidade: ManagedFile[];
+  ctf: ManagedFile[];
+  catalogo: ManagedFile[];
+  contratoSocial: ManagedFile[];
+  capacidadeTecnica: ManagedFile[];
+  outros: ManagedFile[];
+};

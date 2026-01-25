@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import type { Client, Contract, ContractItem, Commitment, Invoice, DashboardContract, DashboardCommitment, DashboardInvoice, GlobalSummaryData, Profile, HabilitacaoData } from './types';
+import type { Client, Contract, ContractItem, Commitment, Invoice, DashboardContract, DashboardCommitment, DashboardInvoice, GlobalSummaryData, Profile, HabilitacaoData, GitHubConfig } from './types';
 import { initialClientsData } from './data/initialData';
 import { Dashboard } from './components/Dashboard';
 import { ClientDetail } from './components/ClientDetail';
@@ -20,6 +20,25 @@ import { HourglassIcon } from './components/icons/HourglassIcon';
 import { BackupButton } from './components/BackupButton';
 import { RestoreButton } from './components/RestoreButton';
 import { LogoPlaceholder } from './components/icons/LogoPlaceholder';
+import { syncToGitHub } from './utils/github';
+import { CloudArrowUpIcon } from './components/icons/CloudArrowUpIcon';
+import { ArrowPathIcon } from './components/icons/ArrowPathIcon';
+
+const initialHabilitacaoData: HabilitacaoData = {
+  certidoes: {
+    estadual: {}, federal: {}, municipal: {}, distrital: {}, fgts: {}, trabalhista: {}, estadualTributaria: {}, falencia: {}, correcional: {}
+  },
+  contabilidade: [], ctf: [], catalogo: [], contratoSocial: [], capacidadeTecnica: [], outros: []
+};
+
+const initialGitHubConfig: GitHubConfig = {
+  enabled: false,
+  token: '',
+  owner: '',
+  repo: '',
+  path: 'data.json',
+  branch: 'main'
+};
 
 export default function App() {
   // Auth State
@@ -32,8 +51,10 @@ export default function App() {
   const [clients, setClients] = useState<Client[] | null>(null);
   const [storedCert, setStoredCert] = useState<string | null>(null);
   const [habilitacaoData, setHabilitacaoData] = useState<HabilitacaoData | null>(null);
+  const [githubConfig, setGithubConfig] = useState<GitHubConfig>(initialGitHubConfig);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSavingData, setIsSavingData] = useState(false);
+  const [isSyncingGitHub, setIsSyncingGitHub] = useState(false);
   const [errorLoading, setErrorLoading] = useState<string | null>(null);
   
   // UI State
@@ -80,6 +101,7 @@ export default function App() {
           setClients(null);
           setStoredCert(null);
           setHabilitacaoData(null);
+          setGithubConfig(initialGitHubConfig);
         }
       }
     );
@@ -131,16 +153,28 @@ export default function App() {
         if (Array.isArray(data.data)) { // old format
           setClients(data.data);
           setStoredCert(null);
-          setHabilitacaoData({});
-        } else { // new object format
+          setHabilitacaoData(initialHabilitacaoData);
+          setGithubConfig(initialGitHubConfig);
+        } else { // new format
           setClients(data.data.clients || []);
           setStoredCert(data.data.certificate || null);
-          setHabilitacaoData(data.data.habilitacao || {});
+          setGithubConfig({ ...initialGitHubConfig, ...(data.data.github || {}) });
+          
+          const rawHabilitacao = data.data.habilitacao || {};
+          setHabilitacaoData({ 
+            ...initialHabilitacaoData, 
+            ...rawHabilitacao,
+            certidoes: {
+              ...initialHabilitacaoData.certidoes,
+              ...(rawHabilitacao.certidoes || (rawHabilitacao.estadual ? rawHabilitacao : {}))
+            }
+          });
         }
       } else {
         setClients(initialClientsData);
         setStoredCert(null);
-        setHabilitacaoData({});
+        setHabilitacaoData(initialHabilitacaoData);
+        setGithubConfig(initialGitHubConfig);
       }
       setIsLoadingData(false);
     };
@@ -151,9 +185,33 @@ export default function App() {
   const debouncedClients = useDebounce(clients, 1500);
   const debouncedCert = useDebounce(storedCert, 1500);
   const debouncedHabilitacao = useDebounce(habilitacaoData, 1500);
+  const debouncedGitHubConfig = useDebounce(githubConfig, 1500);
   const isReadOnly = profile?.role === 'user';
 
-  // Save data (Auto-sync to Cloud)
+  // Manual GitHub Sync Function
+  const forceSyncGitHub = useCallback(async () => {
+    if (!clients || !githubConfig.enabled || isSyncingGitHub) return;
+    
+    setIsSyncingGitHub(true);
+    const payload = { 
+      clients, 
+      certificate: storedCert,
+      habilitacao: habilitacaoData,
+      github: githubConfig
+    };
+    
+    const result = await syncToGitHub(githubConfig, payload);
+    if (result.success) {
+       setGithubConfig(prev => ({ ...prev, lastSync: result.lastSync, error: null }));
+       setNotification({ message: 'Backup enviado para o GitHub!', type: 'success' });
+    } else {
+       setGithubConfig(prev => ({ ...prev, error: result.error }));
+       setNotification({ message: `Erro GitHub: ${result.error}`, type: 'error' });
+    }
+    setIsSyncingGitHub(false);
+  }, [clients, storedCert, habilitacaoData, githubConfig, isSyncingGitHub]);
+
+  // Save data (Auto-sync to Cloud & GitHub)
   useEffect(() => {
     if (debouncedClients === null || isLoadingData || !session || !profile?.is_approved || isReadOnly) {
       return;
@@ -161,19 +219,34 @@ export default function App() {
 
     const saveData = async () => {
       setIsSavingData(true);
-      await supabase.from('app_data').upsert({ 
+      const payload = { 
+        clients: debouncedClients, 
+        certificate: debouncedCert,
+        habilitacao: debouncedHabilitacao,
+        github: debouncedGitHubConfig
+      };
+      
+      const { error } = await supabase.from('app_data').upsert({ 
         id: 1, 
-        data: { 
-          clients: debouncedClients, 
-          certificate: debouncedCert,
-          habilitacao: debouncedHabilitacao,
-        } 
+        data: payload 
       });
+
+      if (!error && debouncedGitHubConfig.enabled) {
+        setIsSyncingGitHub(true);
+        const result = await syncToGitHub(debouncedGitHubConfig, payload);
+        if (result.success) {
+           setGithubConfig(prev => ({ ...prev, lastSync: result.lastSync, error: null }));
+        } else {
+           setGithubConfig(prev => ({ ...prev, error: result.error }));
+        }
+        setIsSyncingGitHub(false);
+      }
+
       setIsSavingData(false);
     };
 
     saveData();
-  }, [debouncedClients, debouncedCert, debouncedHabilitacao, isLoadingData, session, profile, isReadOnly]);
+  }, [debouncedClients, debouncedCert, debouncedHabilitacao, debouncedGitHubConfig, isLoadingData, session, profile, isReadOnly]);
 
   const handleLogout = async () => {
     try {
@@ -183,6 +256,7 @@ export default function App() {
       setClients(null);
       setStoredCert(null);
       setHabilitacaoData(null);
+      setGithubConfig(initialGitHubConfig);
       setSelectedClientId(null);
     } catch (e) {
       console.error("Logout error:", e);
@@ -204,7 +278,11 @@ export default function App() {
     setHabilitacaoData(newData);
   };
 
-  const handleAddContract = ({ clientName, address, cep, clientId, contractData, items }: any) => {
+  const handleUpdateGitHubConfig = (newConfig: GitHubConfig) => {
+    setGithubConfig(newConfig);
+  };
+
+  const handleAddContract = ({ clientName, address, cep, contractData, items }: any) => {
     if (!clients) return;
     
     const finalItems: ContractItem[] = (items || []).map((item: any, index: number) => ({
@@ -219,9 +297,11 @@ export default function App() {
     };
 
     let newClients = [...clients];
-    if (clientId) {
+    const clientExists = newClients.find(c => c.name.trim().toLowerCase() === clientName.trim().toLowerCase());
+    
+    if (clientExists) {
       newClients = newClients.map(c => {
-        if (c.id === clientId) {
+        if (c.id === clientExists.id) {
           const updatedClient = { ...c, contracts: [...c.contracts, newContract] };
           if (address && c.address !== address) updatedClient.address = address;
           if (cep && c.cep !== cep) updatedClient.cep = cep;
@@ -229,20 +309,15 @@ export default function App() {
         }
         return c;
       });
-    } else if (clientName) {
-      const clientExists = newClients.find(c => c.name.trim().toLowerCase() === clientName.trim().toLowerCase());
-      if (clientExists) {
-        newClients = newClients.map(c => c.id === clientExists.id ? { ...c, contracts: [...c.contracts, newContract] } : c);
-      } else {
-        newClients.push({
-          id: Date.now(),
-          name: clientName,
-          uasg: contractData.uasg || '',
-          cnpj: contractData.cnpj,
-          address, cep,
-          contracts: [newContract],
-        });
-      }
+    } else {
+      newClients.push({
+        id: Date.now(),
+        name: clientName,
+        uasg: contractData.uasg || '',
+        cnpj: contractData.cnpj,
+        address, cep,
+        contracts: [newContract],
+      });
     }
     setClients(newClients);
     setNotification({ message: 'Contrato salvo com sucesso!', type: 'success' });
@@ -395,7 +470,7 @@ export default function App() {
 
   const handleBackup = () => {
     if (!clients) return;
-    const dataStr = JSON.stringify({ clients, certificate: storedCert, habilitacao: habilitacaoData }, null, 2);
+    const dataStr = JSON.stringify({ clients, certificate: storedCert, habilitacao: habilitacaoData, github: githubConfig }, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
@@ -426,11 +501,22 @@ export default function App() {
     if (Array.isArray(backupDataToRestore)) {
       setClients(backupDataToRestore);
       setStoredCert(null);
-      setHabilitacaoData({});
+      setHabilitacaoData(initialHabilitacaoData);
+      setGithubConfig(initialGitHubConfig);
     } else {
       setClients(backupDataToRestore.clients || []);
       setStoredCert(backupDataToRestore.certificate || null);
-      setHabilitacaoData(backupDataToRestore.habilitacao || {});
+      setGithubConfig({ ...initialGitHubConfig, ...(backupDataToRestore.github || {}) });
+      
+      const rawHabilitacao = backupDataToRestore.habilitacao || {};
+      setHabilitacaoData({ 
+        ...initialHabilitacaoData, 
+        ...rawHabilitacao,
+        certidoes: {
+          ...initialHabilitacaoData.certidoes,
+          ...(rawHabilitacao.certidoes || (rawHabilitacao.estadual ? rawHabilitacao : {}))
+        }
+      });
     }
     setIsRestoreConfirmOpen(false);
     setBackupDataToRestore(null);
@@ -528,7 +614,23 @@ export default function App() {
               <h1 className="text-xl font-bold text-white font-title hidden sm:block">Oficina da Arte</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-               {isSavingData && <div className="flex items-center gap-2 text-xs text-gray-400"><SpinnerIcon className="w-4 h-4 animate-spin" /><span>Salvando...</span></div>}
+               {(isSavingData || isSyncingGitHub) && (
+                 <div className="flex items-center gap-2 text-[10px] sm:text-xs text-gray-400 font-bold uppercase tracking-widest bg-black/40 px-3 py-1.5 rounded-full border border-gray-800">
+                    <SpinnerIcon className="w-3.5 h-3.5 animate-spin text-yellow-500" />
+                    <span>{isSyncingGitHub ? 'GitHub Sync' : 'Salvando...'}</span>
+                 </div>
+               )}
+               {githubConfig.enabled && githubConfig.lastSync && !isSyncingGitHub && (
+                  <button 
+                    onClick={forceSyncGitHub}
+                    className="group flex items-center gap-2 text-[9px] text-emerald-500 font-black uppercase tracking-widest hover:text-emerald-400 transition-colors" 
+                    title={`Último backup no GitHub: ${new Date(githubConfig.lastSync).toLocaleString()}\nClique para sincronizar agora.`}
+                  >
+                    <CloudArrowUpIcon className="w-4 h-4" />
+                    <span className="hidden lg:inline">Sync OK</span>
+                    <ArrowPathIcon className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" />
+                  </button>
+               )}
                {!isReadOnly && <BackupButton onBackup={handleBackup} />}
                {!isReadOnly && <RestoreButton onRestore={handleFileSelectForRestore} />}
                {profile.role === 'admin' && (
@@ -588,7 +690,16 @@ export default function App() {
       </main>
 
       {isAddingContract && <AddContractModal clients={clients || []} onClose={() => setIsAddingContract(false)} onAddContract={handleAddContract} />}
-      {isAdminPanelOpen && <AdminPanel supabase={supabase} onClose={() => setIsAdminPanelOpen(false)} />}
+      {isAdminPanelOpen && (
+        <AdminPanel 
+          supabase={supabase} 
+          onClose={() => setIsAdminPanelOpen(false)} 
+          githubConfig={githubConfig}
+          onUpdateGitHubConfig={handleUpdateGitHubConfig}
+          onForceSync={forceSyncGitHub}
+          isSyncing={isSyncingGitHub}
+        />
+      )}
       <ConfirmUpdateModal isOpen={isRestoreConfirmOpen} onClose={() => setIsRestoreConfirmOpen(false)} onConfirm={handleConfirmRestore} title="Confirmar Restauração" message={<><p className="mb-2">Você tem certeza que deseja restaurar os dados?</p><p className="font-bold text-red-500">Atenção: Todos os dados atuais serão substituídos.</p></>} confirmText="Sim, Restaurar Dados" confirmButtonClass="bg-red-600 hover:bg-red-700" />
       {notification && <div className={`fixed bottom-5 right-5 z-50 p-4 rounded-lg shadow-lg text-white animate-fade-in-up ${notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>{notification.message}</div>}
     </div>
